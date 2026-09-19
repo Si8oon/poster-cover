@@ -13,14 +13,17 @@ import {
   type CanvasElement,
   type CardElement,
   type CardStat,
+  type SplitImageElement,
 } from '@/lib/types';
 import { TEMPLATES, getTemplate, type TemplateId } from '@/lib/templates';
 
 const PostCanvas = dynamic(() => import('./PostCanvas'), {
   ssr: false,
   loading: () => (
-    <div className="w-[432px] h-[540px] flex items-center justify-center text-sm"
-      style={{ color: 'var(--text-muted)' }}>
+    <div
+      className="w-[432px] h-[540px] flex items-center justify-center text-sm"
+      style={{ color: 'var(--text-muted)' }}
+    >
       Loading canvas...
     </div>
   ),
@@ -47,12 +50,6 @@ const FONTS = [
   { label: 'Verdana', value: 'Verdana, sans-serif' },
 ];
 
-const SERIF_FONTS = [
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'Times', value: '"Times New Roman", serif' },
-  { label: 'Playfair', value: '"Palatino", serif' },
-];
-
 const COLORS = [
   '#ffffff', '#000000', '#00d97e', '#fbbf24', '#ef4444',
   '#8b5cf6', '#22d3ee', '#ec4899', '#22c55e', '#f97316',
@@ -64,8 +61,15 @@ export default function EditorScreen({
   onClose, onSaved, initialTemplate, editingPostId, initialSlides,
 }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
+
+  // ---------- File input refs ----------
+  // We keep these as physical elements in the DOM (not display:none)
+  // so iOS Safari can open them within a user gesture.
+  const bgInputRef = useRef<HTMLInputElement>(null);
   const elementImageInputRef = useRef<HTMLInputElement>(null);
+
   const pendingElementIdRef = useRef<string | null>(null);
+  const pendingSplitSideRef = useRef<'left' | 'right' | null>(null);
 
   const [slides, setSlides] = useState<PostConfig[]>(() => {
     if (initialSlides && initialSlides.length > 0)
@@ -107,7 +111,11 @@ export default function EditorScreen({
     setCurrentIndex((i) => i + 1);
   };
   const deleteSlide = () => {
-    if (slides.length === 1) { setSlides([createEmptySlide()]); setCurrentIndex(0); return; }
+    if (slides.length === 1) {
+      setSlides([createEmptySlide()]);
+      setCurrentIndex(0);
+      return;
+    }
     const next = slides.filter((_, i) => i !== currentIndex);
     setSlides(next);
     setCurrentIndex(Math.min(currentIndex, next.length - 1));
@@ -128,7 +136,14 @@ export default function EditorScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides.length]);
 
+  // ---------- Background upload ----------
   const [bgFile, setBgFile] = useState<File | null>(null);
+
+  // Synchronous click — important for mobile
+  const openBgPicker = () => {
+    bgInputRef.current?.click();
+  };
+
   const handleBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setBgFile(file);
@@ -141,8 +156,11 @@ export default function EditorScreen({
         });
       reader.readAsDataURL(file);
     }
+    // Reset so the same file can be picked again
+    e.target.value = '';
   };
 
+  // ---------- Templates ----------
   const [activeTemplate, setActiveTemplate] = useState<TemplateId | null>(
     initialTemplate ?? null
   );
@@ -163,7 +181,7 @@ export default function EditorScreen({
     );
   };
 
-  // ---------- Element adders ----------
+  // ---------- Add elements ----------
   const addElement = (type: CanvasElement['type']) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     let el: CanvasElement;
@@ -177,9 +195,39 @@ export default function EditorScreen({
     } else if (type === 'headingNumber') {
       el = { id, type: 'headingNumber', x: 0.06, y: 0.12, number: '01', fontSize: 80, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' };
     } else if (type === 'headingText') {
-      el = { id, type: 'headingText', x: 0.06, y: 0.22, text: 'Your big headline goes here', fontSize: 34, color: '#1a1a1a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.85, snap: 'free' };
+      el = { id, type: 'headingText', x: 0.06, y: 0.22, text: 'Your big headline goes here', fontSize: 34, color: '#1a1a1a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.85, align: 'left', shadow: false, snap: 'free' };
     } else if (type === 'bodyText') {
-      el = { id, type: 'bodyText', x: 0.06, y: 0.45, text: 'A short paragraph that describes your story in one or two sentences.', fontSize: 14, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.85, snap: 'free' };
+      el = { id, type: 'bodyText', x: 0.06, y: 0.45, text: 'A short paragraph that describes your story in one or two sentences.', fontSize: 14, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.85, align: 'left', snap: 'free' };
+    } else if (type === 'splitImage') {
+      el = {
+        id, type: 'splitImage',
+        x: 0, y: 0,
+        width: 1,
+        height: 0.55,
+        leftImageUrl: '',
+        rightImageUrl: '',
+        splitRatio: 0.5,
+        divider: 'none',
+        dividerColor: '#ffffff',
+        snap: 'free',
+      };
+    } else if (type === 'quoteMark') {
+      el = { id, type: 'quoteMark', x: 0.06, y: 0.5, char: '"', fontSize: 100, color: '#ffffff', font: 'Georgia, serif', snap: 'free' };
+    } else if (type === 'attribution') {
+      el = {
+        id, type: 'attribution',
+        x: 0.06, y: 0.87,
+        text: '- Author Name, Source (Year)',
+        fontSize: 13,
+        color: '#ffffff',
+        font: 'Inter, system-ui, sans-serif',
+        letterSpacing: 1,
+        uppercase: false,
+        bold: true,
+        width: 0.85,
+        align: 'left',
+        snap: 'free',
+      };
     } else {
       el = {
         id, type: 'card',
@@ -213,23 +261,61 @@ export default function EditorScreen({
       ),
     });
   };
+
+  // ---------- Image pickers ----------
+  // These are triggered SYNCHRONOUSLY by user gestures (important for mobile)
   const handleRequestImage = (elementId: string) => {
     pendingElementIdRef.current = elementId;
+    pendingSplitSideRef.current = null;
     elementImageInputRef.current?.click();
   };
+
+  const handleSplitImageRequest = (elementId: string, side: 'left' | 'right') => {
+    pendingElementIdRef.current = elementId;
+    pendingSplitSideRef.current = side;
+    elementImageInputRef.current?.click();
+  };
+
   const handleElementImagePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const id = pendingElementIdRef.current;
     const file = e.target.files?.[0];
-    if (!id || !file) return;
+    if (!id || !file) {
+      pendingElementIdRef.current = null;
+      pendingSplitSideRef.current = null;
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
-      updateElement(id, { imageUrl: reader.result as string } as Partial<CanvasElement>);
+      const dataUrl = reader.result as string;
+      const el = currentSlide.elements.find((x) => x.id === id);
+      if (el && el.type === 'splitImage' && pendingSplitSideRef.current) {
+        if (pendingSplitSideRef.current === 'left') {
+          updateElement(id, { leftImageUrl: dataUrl } as Partial<CanvasElement>);
+        } else {
+          updateElement(id, { rightImageUrl: dataUrl } as Partial<CanvasElement>);
+        }
+      } else {
+        updateElement(id, { imageUrl: dataUrl } as Partial<CanvasElement>);
+      }
       pendingElementIdRef.current = null;
+      pendingSplitSideRef.current = null;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
+  // ---------- Fallback buttons (mobile-friendly) ----------
+  const hasSplitImage = currentSlide.elements.some((e) => e.type === 'splitImage');
+  const splitEl = currentSlide.elements.find((e) => e.type === 'splitImage') as
+    | SplitImageElement
+    | undefined;
+
+  const hasCircleImage = currentSlide.elements.some(
+    (e) => e.type === 'circleImage' && !(e as { imageUrl?: string }).imageUrl
+  );
+
+  // ---------- Tabs / save ----------
   const [tab, setTab] = useState<Tab>('template');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -254,7 +340,9 @@ export default function EditorScreen({
     const stage = stageRef.current;
     if (!stage) return;
     const hasContent =
-      currentSlide.backgroundImage || currentSlide.paperBg !== 'none';
+      currentSlide.backgroundImage ||
+      currentSlide.paperBg !== 'none' ||
+      currentSlide.elements.some((e) => e.type === 'splitImage');
     if (!hasContent) {
       setToast('Add a photo or pick a paper style');
       setTimeout(() => setToast(null), 2200);
@@ -282,8 +370,36 @@ export default function EditorScreen({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col slide-up" style={{ background: 'var(--bg)' }}>
-      <input ref={elementImageInputRef} type="file" accept="image/*" className="hidden"
-        onChange={handleElementImagePicked} />
+      {/* ---------- Hidden inputs (visible to DOM, invisible to eye) ---------- */}
+      {/* NOT using `display: none` — iOS Safari refuses those for file pickers */}
+      <input
+        ref={bgInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleBgChange}
+        style={{
+          position: 'fixed',
+          left: -9999,
+          top: -9999,
+          width: 1,
+          height: 1,
+          opacity: 0,
+        }}
+      />
+      <input
+        ref={elementImageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleElementImagePicked}
+        style={{
+          position: 'fixed',
+          left: -9999,
+          top: -9999,
+          width: 1,
+          height: 1,
+          opacity: 0,
+        }}
+      />
 
       <header className="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}>
@@ -328,7 +444,99 @@ export default function EditorScreen({
               style={{ border: '1px solid var(--border)' }}>
               <PostCanvas config={currentSlide} onChange={updateCurrentSlide}
                 stageRef={stageRef} onRequestImage={handleRequestImage}
+                onRequestSplitImage={handleSplitImageRequest}
                 slideIndex={currentIndex} slideCount={slides.length} />
+            </div>
+
+            {/* ---------- MOBILE FALLBACK UPLOAD BUTTONS ---------- */}
+            {/* These appear right below the canvas so mobile users always have
+                an obvious way to add photos, even if canvas taps fail */}
+            <div className="w-full max-w-[432px] flex flex-col gap-2">
+              {/* Background fallback (always shown) */}
+              <button
+                type="button"
+                onClick={openBgPicker}
+                className="w-full py-3 rounded-2xl text-sm font-semibold transition active:scale-95"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px dashed var(--border)',
+                  color: bgFile ? 'var(--accent)' : 'var(--text)',
+                }}
+              >
+                📸 {bgFile ? 'Change background photo' : 'Upload background photo'}
+              </button>
+
+              {/* Split image fallbacks (only when split image exists) */}
+              {hasSplitImage && splitEl && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSplitImageRequest(splitEl.id, 'left')
+                    }
+                    className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
+                    style={{
+                      background: 'var(--card)',
+                      border: '1px dashed var(--border)',
+                      color: splitEl.leftImageUrl
+                        ? 'var(--accent)'
+                        : 'var(--text)',
+                    }}
+                  >
+                    🖼️ {splitEl.leftImageUrl ? 'Change left photo' : 'Add left photo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSplitImageRequest(splitEl.id, 'right')
+                    }
+                    className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
+                    style={{
+                      background: 'var(--card)',
+                      border: '1px dashed var(--border)',
+                      color: splitEl.rightImageUrl
+                        ? 'var(--accent)'
+                        : 'var(--text)',
+                    }}
+                  >
+                    🖼️ {splitEl.rightImageUrl ? 'Change right photo' : 'Add right photo'}
+                  </button>
+                </div>
+              )}
+
+              {/* Circle image fallback */}
+              {hasCircleImage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const circleEl = currentSlide.elements.find(
+                      (e) => e.type === 'circleImage' && !(e as { imageUrl?: string }).imageUrl
+                    );
+                    if (circleEl) handleRequestImage(circleEl.id);
+                  }}
+                  className="w-full py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
+                  style={{
+                    background: 'var(--card)',
+                    border: '1px dashed var(--border)',
+                    color: 'var(--text)',
+                  }}
+                >
+                  ⭕ Add circle photo
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleDownloadAll}
+                className="w-full py-3 rounded-2xl text-sm font-semibold active:scale-95 transition"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                }}
+              >
+                ⬇ Download {slides.length > 1 ? `all ${slides.length} slides` : 'PNG'}
+              </button>
             </div>
 
             {slides.length > 1 && (
@@ -349,25 +557,12 @@ export default function EditorScreen({
               </div>
             )}
 
-            <button onClick={handleDownloadAll}
-              className="w-full max-w-[432px] py-3 rounded-2xl text-sm font-semibold active:scale-95 transition"
-              style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-              ⬇ Download {slides.length > 1 ? `all ${slides.length} slides` : 'PNG'}
-            </button>
-
             <p className="text-[10px] hidden lg:block" style={{ color: 'var(--text-muted)' }}>
               Tip: use ← → to switch slides, Esc to close
             </p>
           </div>
 
           <aside className="w-full lg:w-[400px] flex flex-col gap-4">
-            <label className="cursor-pointer rounded-2xl p-4 text-center text-sm transition"
-              style={{ background: 'var(--card)', border: '2px dashed var(--border)', color: 'var(--text-muted)' }}>
-              <input type="file" accept="image/*" className="hidden" onChange={handleBgChange} />
-              {bgFile ? <span style={{ color: 'var(--accent)' }}>✓ {bgFile.name}</span>
-                : <><p className="text-xl mb-1">📸</p><p>Upload background photo (this slide)</p></>}
-            </label>
-
             <div className="flex gap-1 p-1 rounded-2xl overflow-x-auto no-scrollbar"
               style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
               {(['template', 'text', 'fx', 'style', 'elements'] as Tab[]).map((t) => (
@@ -661,6 +856,11 @@ export default function EditorScreen({
                     <option value="solid">Solid</option>
                     <option value="gradient-bottom">Gradient (bottom)</option>
                     <option value="gradient-top">Gradient (top)</option>
+                    <option value="cinematic">🎬 Cinematic (bottom fade)</option>
+                    <option value="cinematic-soft">🎬 Cinematic (soft)</option>
+                    <option value="double">🎬 Double (wash + fade)</option>
+                    <option value="vignette">🎬 Vignette (corners)</option>
+                    <option value="bottom-half">🎬 Bottom half (hard)</option>
                   </select>
                 </div>
 
@@ -694,6 +894,15 @@ export default function EditorScreen({
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-2">
+                  <Label>Split quote kit ⭐</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <AddButton onClick={() => addElement('splitImage')} emoji="🖼️" label="Split Image" />
+                    <AddButton onClick={() => addElement('quoteMark')} emoji="❝" label="Quote Mark" />
+                    <AddButton onClick={() => addElement('attribution')} emoji="🖋️" label="Attribution" />
+                  </div>
+                </div>
+
                 {currentSlide.elements.length === 0 ? (
                   <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
                     No elements on this slide yet.
@@ -704,7 +913,8 @@ export default function EditorScreen({
                       <ElementControls key={el.id} element={el}
                         onChange={(patch) => updateElement(el.id, patch)}
                         onRemove={() => removeElement(el.id)}
-                        onRequestImage={() => handleRequestImage(el.id)} />
+                        onRequestImage={() => handleRequestImage(el.id)}
+                        onSplitImageRequest={(side) => handleSplitImageRequest(el.id, side)} />
                     ))}
                   </div>
                 )}
@@ -774,137 +984,6 @@ function PresetButton({ label, onClick }: { label: string; onClick: () => void }
   );
 }
 
-function ElementControls({
-  element, onChange, onRemove, onRequestImage,
-}: {
-  element: CanvasElement;
-  onChange: (patch: Partial<CanvasElement>) => void;
-  onRemove: () => void;
-  onRequestImage: () => void;
-}) {
-  const typeLabel: Record<CanvasElement['type'], string> = {
-    circleImage: '⭕ Circle image',
-    logoPill: '🏷️ Logo pill',
-    swipeArrow: '➡️ Swipe arrow',
-    headingNumber: '🔢 Big number',
-    headingText: '📰 Heading text',
-    bodyText: '📄 Body text',
-    card: '🗂️ Info card',
-  };
-
-  return (
-    <div className="p-3 rounded-2xl flex flex-col gap-3"
-      style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold">{typeLabel[element.type]}</span>
-        <button onClick={onRemove} className="text-xs px-2 py-1 rounded-lg" style={{ color: '#ef4444' }}>
-          Remove
-        </button>
-      </div>
-
-      {element.type === 'circleImage' && (
-        <>
-          <button onClick={onRequestImage}
-            className="text-xs py-2 px-3 rounded-xl text-center transition"
-            style={{
-              background: 'var(--bg)',
-              border: '1px dashed var(--border)',
-              color: element.imageUrl ? 'var(--accent)' : 'var(--text-muted)',
-            }}>
-            {element.imageUrl ? '✓ Image set — tap to change' : 'Pick image'}
-          </button>
-          <RangeRow label="Size" min={10} max={50} value={element.size * 100}
-            display={`${Math.round(element.size * 100)}%`}
-            onChange={(v) => onChange({ size: v / 100 } as Partial<CanvasElement>)} />
-        </>
-      )}
-
-      {element.type === 'logoPill' && (
-        <>
-          <input value={element.text}
-            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
-            placeholder="Logo text"
-            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <MiniColorRow label="BG" colors={['#ef4444', '#fbbf24', '#22d3ee', '#8b5cf6', '#22c55e', '#e07a3f', '#000000']}
-            value={element.bgColor}
-            onChange={(c) => onChange({ bgColor: c } as Partial<CanvasElement>)} />
-        </>
-      )}
-
-      {element.type === 'swipeArrow' && (
-        <RangeRow label="Size" min={5} max={20} value={element.size * 100}
-          display={`${Math.round(element.size * 100)}%`}
-          onChange={(v) => onChange({ size: v / 100 } as Partial<CanvasElement>)} />
-      )}
-
-      {element.type === 'headingNumber' && (
-        <>
-          <input value={element.number}
-            onChange={(e) => onChange({ number: e.target.value } as Partial<CanvasElement>)}
-            placeholder="01"
-            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <RangeRow label="Size" min={30} max={140} value={element.fontSize}
-            display={`${element.fontSize}px`}
-            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <MiniColorRow label="Color" colors={['#e07a3f', '#111111', '#fbbf24', '#22c55e', '#ef4444', '#22d3ee']}
-            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
-          <button onClick={() => onChange({ italic: !element.italic } as Partial<CanvasElement>)}
-            className="py-2 rounded-xl text-xs font-semibold"
-            style={{
-              background: element.italic ? 'var(--accent)' : 'var(--bg)',
-              color: element.italic ? 'var(--accent-fg)' : 'var(--text-muted)',
-              border: '1px solid var(--border)',
-            }}>Italic {element.italic ? 'ON' : 'OFF'}</button>
-        </>
-      )}
-
-      {element.type === 'headingText' && (
-        <>
-          <textarea value={element.text}
-            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
-            rows={2}
-            placeholder="Your big headline"
-            className="w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <RangeRow label="Size" min={16} max={60} value={element.fontSize}
-            display={`${element.fontSize}px`}
-            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
-            display={`${Math.round(element.width * 100)}%`}
-            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
-          <MiniColorRow label="Color" colors={['#111111', '#ffffff', '#e07a3f', '#fbbf24', '#22c55e', '#ef4444']}
-            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
-        </>
-      )}
-
-      {element.type === 'bodyText' && (
-        <>
-          <textarea value={element.text}
-            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
-            rows={3}
-            placeholder="Paragraph text"
-            className="w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <RangeRow label="Size" min={10} max={24} value={element.fontSize}
-            display={`${element.fontSize}px`}
-            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
-            display={`${Math.round(element.width * 100)}%`}
-            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
-          <MiniColorRow label="Color" colors={['#4a4a4a', '#111111', '#ffffff', '#666666', '#e07a3f']}
-            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
-        </>
-      )}
-
-      {element.type === 'card' && (
-        <CardControls element={element} onChange={onChange} />
-      )}
-    </div>
-  );
-}
-
 function RangeRow({
   label, min, max, value, display, onChange,
 }: {
@@ -943,6 +1022,244 @@ function MiniColorRow({
   );
 }
 
+// ---------- Element controls ----------
+function ElementControls({
+  element, onChange, onRemove, onRequestImage, onSplitImageRequest,
+}: {
+  element: CanvasElement;
+  onChange: (patch: Partial<CanvasElement>) => void;
+  onRemove: () => void;
+  onRequestImage: () => void;
+  onSplitImageRequest: (side: 'left' | 'right') => void;
+}) {
+  const typeLabel: Record<CanvasElement['type'], string> = {
+    circleImage: '⭕ Circle image',
+    logoPill: '🏷️ Logo pill',
+    swipeArrow: '➡️ Swipe arrow',
+    headingNumber: '🔢 Big number',
+    headingText: '📰 Heading text',
+    bodyText: '📄 Body text',
+    card: '🗂️ Info card',
+    splitImage: '🖼️ Split image',
+    quoteMark: '❝ Quote mark',
+    attribution: '🖋️ Attribution',
+  };
+
+  return (
+    <div className="p-3 rounded-2xl flex flex-col gap-3"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold">{typeLabel[element.type]}</span>
+        <button onClick={onRemove} className="text-xs px-2 py-1 rounded-lg" style={{ color: '#ef4444' }}>
+          Remove
+        </button>
+      </div>
+
+      {element.type === 'circleImage' && (
+        <>
+          <button onClick={onRequestImage}
+            className="text-xs py-2 px-3 rounded-xl text-center transition"
+            style={{
+              background: 'var(--bg)',
+              border: '1px dashed var(--border)',
+              color: element.imageUrl ? 'var(--accent)' : 'var(--text-muted)',
+            }}>
+            {element.imageUrl ? '✓ Image set — tap to change' : 'Pick image'}
+          </button>
+          <RangeRow label="Size" min={10} max={50} value={element.size * 100}
+            display={`${Math.round(element.size * 100)}%`}
+            onChange={(v) => onChange({ size: v / 100 } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'splitImage' && (
+        <SplitImageControls element={element} onChange={onChange} onRequestImage={onSplitImageRequest} />
+      )}
+
+      {element.type === 'quoteMark' && (
+        <>
+          <input value={element.char}
+            onChange={(e) => onChange({ char: e.target.value } as Partial<CanvasElement>)}
+            placeholder={'"'}
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <div className="flex gap-1">
+            {['"', '❝', '„', '「', '❞'].map((c) => (
+              <button key={c} onClick={() => onChange({ char: c } as Partial<CanvasElement>)}
+                className="w-7 h-7 rounded-lg text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>{c}</button>
+            ))}
+          </div>
+          <RangeRow label="Size" min={40} max={180} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color" colors={['#ffffff', '#e07a3f', '#fbbf24', '#22c55e', '#ef4444']}
+            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'attribution' && (
+        <>
+          <input value={element.text}
+            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
+            placeholder="- Author, Source (Year)"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <RangeRow label="Size" min={9} max={22} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <RangeRow label="Letter spacing" min={0} max={4} value={element.letterSpacing}
+            display={`${element.letterSpacing.toFixed(1)}px`}
+            onChange={(v) => onChange({ letterSpacing: v } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color" colors={['#ffffff', '#e07a3f', '#fbbf24', '#000000', '#666666']}
+            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'logoPill' && (
+        <>
+          <input value={element.text}
+            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
+            placeholder="Logo text"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <MiniColorRow label="BG" colors={['#ef4444', '#fbbf24', '#22d3ee', '#8b5cf6', '#22c55e', '#e07a3f', '#000000']}
+            value={element.bgColor}
+            onChange={(c) => onChange({ bgColor: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'swipeArrow' && (
+        <RangeRow label="Size" min={5} max={20} value={element.size * 100}
+          display={`${Math.round(element.size * 100)}%`}
+          onChange={(v) => onChange({ size: v / 100 } as Partial<CanvasElement>)} />
+      )}
+
+      {element.type === 'headingNumber' && (
+        <>
+          <input value={element.number}
+            onChange={(e) => onChange({ number: e.target.value } as Partial<CanvasElement>)}
+            placeholder="01"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <RangeRow label="Size" min={30} max={140} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color" colors={['#e07a3f', '#111111', '#fbbf24', '#22c55e', '#ef4444', '#22d3ee']}
+            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'headingText' && (
+        <>
+          <textarea value={element.text}
+            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
+            rows={2}
+            placeholder="Your big headline"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <RangeRow label="Size" min={16} max={60} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
+            display={`${Math.round(element.width * 100)}%`}
+            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color" colors={['#111111', '#ffffff', '#e07a3f', '#fbbf24', '#22c55e', '#ef4444']}
+            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+          <button onClick={() => onChange({ shadow: !element.shadow } as Partial<CanvasElement>)}
+            className="py-2 rounded-xl text-[10px] font-semibold"
+            style={{
+              background: element.shadow ? 'var(--accent)' : 'var(--bg)',
+              color: element.shadow ? 'var(--accent-fg)' : 'var(--text-muted)',
+              border: '1px solid var(--border)',
+            }}>Text Shadow {element.shadow ? 'ON' : 'OFF'}</button>
+        </>
+      )}
+
+      {element.type === 'bodyText' && (
+        <>
+          <textarea value={element.text}
+            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
+            rows={3}
+            placeholder="Paragraph text"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <RangeRow label="Size" min={10} max={24} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
+            display={`${Math.round(element.width * 100)}%`}
+            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color" colors={['#4a4a4a', '#111111', '#ffffff', '#666666', '#e07a3f']}
+            value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'card' && (
+        <CardControls element={element} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+// ---------- SplitImage controls ----------
+function SplitImageControls({
+  element, onChange, onRequestImage,
+}: {
+  element: SplitImageElement;
+  onChange: (patch: Partial<CanvasElement>) => void;
+  onRequestImage: (side: 'left' | 'right') => void;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => onRequestImage('left')}
+          className="text-[10px] py-2 px-2 rounded-xl text-center transition"
+          style={{
+            background: 'var(--bg)',
+            border: '1px dashed var(--border)',
+            color: element.leftImageUrl ? 'var(--accent)' : 'var(--text-muted)',
+          }}>
+          {element.leftImageUrl ? '✓ Left set' : 'Left image'}
+        </button>
+        <button onClick={() => onRequestImage('right')}
+          className="text-[10px] py-2 px-2 rounded-xl text-center transition"
+          style={{
+            background: 'var(--bg)',
+            border: '1px dashed var(--border)',
+            color: element.rightImageUrl ? 'var(--accent)' : 'var(--text-muted)',
+          }}>
+          {element.rightImageUrl ? '✓ Right set' : 'Right image'}
+        </button>
+      </div>
+      <RangeRow label="Split ratio" min={20} max={80} value={element.splitRatio * 100}
+        display={`${Math.round(element.splitRatio * 100)} / ${Math.round(100 - element.splitRatio * 100)}`}
+        onChange={(v) => onChange({ splitRatio: v / 100 } as Partial<CanvasElement>)} />
+      <RangeRow label="Width" min={40} max={100} value={element.width * 100}
+        display={`${Math.round(element.width * 100)}%`}
+        onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
+      <RangeRow label="Height" min={20} max={100} value={element.height * 100}
+        display={`${Math.round(element.height * 100)}%`}
+        onChange={(v) => onChange({ height: v / 100 } as Partial<CanvasElement>)} />
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Divider</span>
+        <div className="grid grid-cols-3 gap-2">
+          {(['none', 'line', 'gap'] as const).map((d) => (
+            <button key={d} onClick={() => onChange({ divider: d } as Partial<CanvasElement>)}
+              className="py-1.5 rounded-lg text-[10px] font-semibold capitalize"
+              style={{
+                background: element.divider === d ? 'var(--accent)' : 'var(--bg)',
+                color: element.divider === d ? 'var(--accent-fg)' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+              }}>{d}</button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ---------- Card controls ----------
 function CardControls({
   element, onChange,
 }: {
@@ -950,7 +1267,6 @@ function CardControls({
   onChange: (patch: Partial<CanvasElement>) => void;
 }) {
   const stats = element.stats ?? [];
-
   const updateStat = (i: number, patch: Partial<CardStat>) => {
     const next = stats.map((s, idx) => (idx === i ? { ...s, ...patch } : s));
     onChange({ stats: next } as Partial<CanvasElement>);

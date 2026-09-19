@@ -7,13 +7,18 @@ export type ElementType =
   | 'headingNumber'
   | 'headingText'
   | 'bodyText'
-  | 'card';
+  | 'card'
+  | 'splitImage'
+  | 'quoteMark'
+  | 'attribution';
 
 export type SnapPosition =
   | 'top-left' | 'top-center' | 'top-right'
   | 'middle-left' | 'middle-center' | 'middle-right'
   | 'bottom-left' | 'bottom-center' | 'bottom-right'
   | 'free';
+
+// ---------- Existing elements ----------
 
 export type CircleImageElement = {
   id: string;
@@ -48,17 +53,15 @@ export type SwipeArrowElement = {
   snap: SnapPosition;
 };
 
-// ---------- NEW element types ----------
-
 export type HeadingNumberElement = {
   id: string;
   type: 'headingNumber';
   x: number;
   y: number;
-  number: string;      // "01", "02"
-  fontSize: number;    // canvas units (default 90)
+  number: string;
+  fontSize: number;
   color: string;
-  font: string;        // serif by default
+  font: string;
   italic: boolean;
   snap: SnapPosition;
 };
@@ -74,7 +77,9 @@ export type HeadingTextElement = {
   font: string;
   lineHeight: number;
   bold: boolean;
-  width: number;       // 0-1 relative to canvas
+  width: number;
+  align?: 'left' | 'center' | 'right';
+  shadow?: boolean;
   snap: SnapPosition;
 };
 
@@ -89,13 +94,14 @@ export type BodyTextElement = {
   font: string;
   lineHeight: number;
   width: number;
+  align?: 'left' | 'center' | 'right';
   snap: SnapPosition;
 };
 
 export type CardStat = {
-  icon: string;   // emoji or short symbol
-  value: string;  // "10.5k"
-  label: string;  // "Stars"
+  icon: string;
+  value: string;
+  label: string;
 };
 
 export type CardElement = {
@@ -103,15 +109,61 @@ export type CardElement = {
   type: 'card';
   x: number;
   y: number;
-  width: number;       // 0-1 relative
-  title: string;       // "bilawalsidhu/gods-eye-view"
-  subtitle: string;    // "Photorealistic 3D globe..."
-  stats: CardStat[];   // up to 3
-  bgColor: string;     // "#ffffff"
+  width: number;
+  title: string;
+  subtitle: string;
+  stats: CardStat[];
+  bgColor: string;
   titleColor: string;
   subtitleColor: string;
-  accentColor: string; // bottom accent stripe
+  accentColor: string;
   shadow: boolean;
+  snap: SnapPosition;
+};
+
+// ---------- NEW: split image, quote mark, attribution ----------
+
+export type SplitImageElement = {
+  id: string;
+  type: 'splitImage';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  leftImageUrl: string;
+  rightImageUrl: string;
+  splitRatio: number;
+  divider: 'none' | 'line' | 'gap';
+  dividerColor: string;
+  snap: SnapPosition;
+};
+
+export type QuoteMarkElement = {
+  id: string;
+  type: 'quoteMark';
+  x: number;
+  y: number;
+  char: string;
+  fontSize: number;
+  color: string;
+  font: string;
+  snap: SnapPosition;
+};
+
+export type AttributionElement = {
+  id: string;
+  type: 'attribution';
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  color: string;
+  font: string;
+  letterSpacing: number;
+  uppercase?: boolean;
+  bold?: boolean;
+  width: number;
+  align?: 'left' | 'center' | 'right';
   snap: SnapPosition;
 };
 
@@ -122,11 +174,24 @@ export type CanvasElement =
   | HeadingNumberElement
   | HeadingTextElement
   | BodyTextElement
-  | CardElement;
+  | CardElement
+  | SplitImageElement
+  | QuoteMarkElement
+  | AttributionElement;
 
 // ---------- Shared ----------
 
-export type OverlayStyle = 'none' | 'solid' | 'gradient-bottom' | 'gradient-top';
+export type OverlayStyle =
+  | 'none'
+  | 'solid'
+  | 'gradient-bottom'
+  | 'gradient-top'
+  | 'cinematic'
+  | 'cinematic-soft'
+  | 'double'
+  | 'vignette'
+  | 'bottom-half';
+
 export type TextAlign = 'left' | 'center' | 'right';
 export type PaperBg = 'none' | 'cream' | 'grid' | 'lined';
 

@@ -18,6 +18,11 @@ import type {
   PostConfig,
   PaperBg,
   SnapPosition,
+  CardElement,
+  SplitImageElement,
+  HeadingTextElement,
+  BodyTextElement,
+  AttributionElement,
 } from '@/lib/types';
 
 export const CANVAS_W = 432;
@@ -28,7 +33,7 @@ type Props = {
   onChange: (partial: Partial<PostConfig>) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
   onRequestImage: (elementId: string) => void;
-  /** For the header's "current / total" display */
+  onRequestSplitImage?: (elementId: string, side: 'left' | 'right') => void;
   slideIndex?: number;
   slideCount?: number;
 };
@@ -57,6 +62,7 @@ export default function PostCanvas({
   onChange,
   stageRef,
   onRequestImage,
+  onRequestSplitImage,
   slideIndex = 0,
   slideCount = 1,
 }: Props) {
@@ -74,7 +80,6 @@ export default function PostCanvas({
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
     img.src = config.backgroundImage;
-
     img.onload = () => {
       setBgImage(img);
       const scale = Math.max(CANVAS_W / img.width, CANVAS_H / img.height);
@@ -100,24 +105,18 @@ export default function PostCanvas({
     onChange({ elements: next });
   };
 
-  // Header offset shifts content down when header is enabled
   const headerOffset = config.header?.enabled ? HEADER_H : 0;
   const showEmptyHint = !config.backgroundImage && config.paperBg === 'none';
 
   return (
     <Stage ref={stageRef} width={CANVAS_W} height={CANVAS_H}>
       <Layer>
-        {/* Paper background */}
-        {config.paperBg !== 'none' && (
-          <PaperBackground type={config.paperBg} />
-        )}
+        {config.paperBg !== 'none' && <PaperBackground type={config.paperBg} />}
 
-        {/* Fallback when neither image nor paper */}
         {!bgImage && config.paperBg === 'none' && (
           <Rect x={0} y={0} width={CANVAS_W} height={CANVAS_H} fill="#f3f4f6" />
         )}
 
-        {/* Photo */}
         {bgImage && bgProps && (
           <KonvaImage
             image={bgImage}
@@ -138,12 +137,6 @@ export default function PostCanvas({
               fontSize={16} fontFamily="Inter, system-ui, sans-serif"
               fontStyle="bold" fill="#9ca3af"
             />
-            <Text
-              text="Use the upload button or the Paper option"
-              x={0} y={CANVAS_H / 2 + 30} width={CANVAS_W} align="center"
-              fontSize={12} fontFamily="Inter, system-ui, sans-serif"
-              fill="#9ca3af"
-            />
           </>
         )}
 
@@ -151,83 +144,51 @@ export default function PostCanvas({
           <Overlay style={config.overlayStyle} opacity={config.overlayOpacity} />
         )}
 
-        {/* Headline (shifted for header if enabled) */}
         {config.headline.trim().length > 0 && (
           <HighlightedHeadline config={config} offsetY={headerOffset} />
         )}
 
-        {/* Elements */}
         {config.elements.map((el) => (
           <ElementRenderer
             key={el.id}
             element={el}
             onChange={(patch) => updateElement(el.id, patch)}
             onRequestImage={() => onRequestImage(el.id)}
+            onRequestSplitImage={(side) =>
+              onRequestSplitImage
+                ? onRequestSplitImage(el.id, side)
+                : onRequestImage(el.id)
+            }
           />
         ))}
 
-        {/* Auto header — rendered LAST so it's on top */}
         {config.header?.enabled && (
-          <AutoHeader
-            config={config}
-            slideIndex={slideIndex}
-            slideCount={slideCount}
-          />
+          <AutoHeader config={config} slideIndex={slideIndex} slideCount={slideCount} />
         )}
       </Layer>
     </Stage>
   );
 }
 
-// ---------------- Paper background ----------------
+// ---------------- Paper ----------------
 function PaperBackground({ type }: { type: PaperBg }) {
   const baseColor =
     type === 'cream' ? '#faf7f0' :
     type === 'grid' ? '#faf7f0' :
-    type === 'lined' ? '#fdfcf8' :
-    '#f3f4f6';
+    type === 'lined' ? '#fdfcf8' : '#f3f4f6';
 
   const lines = [];
-
   if (type === 'grid') {
     const step = 14;
-    for (let x = 0; x <= CANVAS_W; x += step) {
-      lines.push(
-        <Line
-          key={`v${x}`}
-          points={[x, 0, x, CANVAS_H]}
-          stroke="rgba(0,0,0,0.045)"
-          strokeWidth={1}
-          listening={false}
-        />
-      );
-    }
-    for (let y = 0; y <= CANVAS_H; y += step) {
-      lines.push(
-        <Line
-          key={`h${y}`}
-          points={[0, y, CANVAS_W, y]}
-          stroke="rgba(0,0,0,0.045)"
-          strokeWidth={1}
-          listening={false}
-        />
-      );
-    }
+    for (let x = 0; x <= CANVAS_W; x += step)
+      lines.push(<Line key={`v${x}`} points={[x, 0, x, CANVAS_H]} stroke="rgba(0,0,0,0.045)" strokeWidth={1} listening={false} />);
+    for (let y = 0; y <= CANVAS_H; y += step)
+      lines.push(<Line key={`h${y}`} points={[0, y, CANVAS_W, y]} stroke="rgba(0,0,0,0.045)" strokeWidth={1} listening={false} />);
   }
-
   if (type === 'lined') {
     const step = 26;
-    for (let y = step; y < CANVAS_H; y += step) {
-      lines.push(
-        <Line
-          key={`l${y}`}
-          points={[0, y, CANVAS_W, y]}
-          stroke="rgba(120,120,180,0.15)"
-          strokeWidth={1}
-          listening={false}
-        />
-      );
-    }
+    for (let y = step; y < CANVAS_H; y += step)
+      lines.push(<Line key={`l${y}`} points={[0, y, CANVAS_W, y]} stroke="rgba(120,120,180,0.15)" strokeWidth={1} listening={false} />);
   }
 
   return (
@@ -240,9 +201,7 @@ function PaperBackground({ type }: { type: PaperBg }) {
 
 // ---------------- Auto header ----------------
 function AutoHeader({
-  config,
-  slideIndex,
-  slideCount,
+  config, slideIndex, slideCount,
 }: {
   config: PostConfig;
   slideIndex: number;
@@ -250,7 +209,6 @@ function AutoHeader({
 }) {
   const h = config.header;
   if (!h?.enabled) return null;
-
   const PAD = 20;
   const counter = h.showCounter
     ? `${String(slideIndex + 1).padStart(2, '0')} / ${String(slideCount).padStart(2, '0')}`
@@ -258,58 +216,21 @@ function AutoHeader({
 
   return (
     <>
-      {/* Handle text */}
-      <Text
-        text={h.handle}
-        x={PAD}
-        y={PAD}
-        fontSize={12}
-        fontFamily="Inter, system-ui, sans-serif"
-        fontStyle="bold"
-        fill={h.textColor}
-        listening={false}
-      />
-
-      {/* Counter */}
+      <Text text={h.handle} x={PAD} y={PAD} fontSize={12}
+        fontFamily="Inter, system-ui, sans-serif" fontStyle="bold"
+        fill={h.textColor} listening={false} />
       {counter && (
-        <Text
-          text={counter}
-          x={0}
-          y={PAD}
-          width={CANVAS_W - PAD}
-          align="right"
-          fontSize={12}
-          fontFamily="Inter, system-ui, sans-serif"
-          fontStyle="bold"
-          fill={h.textColor}
-          opacity={0.85}
-          listening={false}
-        />
+        <Text text={counter} x={0} y={PAD} width={CANVAS_W - PAD} align="right"
+          fontSize={12} fontFamily="Inter, system-ui, sans-serif"
+          fontStyle="bold" fill={h.textColor} opacity={0.85} listening={false} />
       )}
-
-      {/* Progress bar */}
       {h.showProgress && (
         <>
-          {/* Track */}
-          <Rect
-            x={PAD}
-            y={PAD + 24}
-            width={CANVAS_W - PAD * 2}
-            height={3}
-            cornerRadius={1.5}
-            fill="rgba(0,0,0,0.08)"
-            listening={false}
-          />
-          {/* Fill */}
-          <Rect
-            x={PAD}
-            y={PAD + 24}
+          <Rect x={PAD} y={PAD + 24} width={CANVAS_W - PAD * 2} height={3}
+            cornerRadius={1.5} fill="rgba(0,0,0,0.08)" listening={false} />
+          <Rect x={PAD} y={PAD + 24}
             width={((slideIndex + 1) / slideCount) * (CANVAS_W - PAD * 2)}
-            height={3}
-            cornerRadius={1.5}
-            fill={h.accentColor}
-            listening={false}
-          />
+            height={3} cornerRadius={1.5} fill={h.accentColor} listening={false} />
         </>
       )}
     </>
@@ -318,40 +239,119 @@ function AutoHeader({
 
 // ---------------- Overlay ----------------
 function Overlay({
-  style,
-  opacity,
+  style, opacity,
 }: {
   style: PostConfig['overlayStyle'];
   opacity: number;
 }) {
   if (style === 'none') return null;
-  const safeOpacity = typeof opacity === 'number' ? opacity : 0.45;
+  const o = typeof opacity === 'number' ? opacity : 0.45;
+  const steps = 22;
+
+  const buildGradient = (points: { y: number; alpha: number }[]) => {
+    const rects: React.ReactNode[] = [];
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      const y = t * CANVAS_H;
+      let alpha = 0;
+      for (let p = 0; p < points.length - 1; p++) {
+        const a = points[p];
+        const b = points[p + 1];
+        if (y >= a.y && y <= b.y) {
+          const local = (y - a.y) / (b.y - a.y);
+          alpha = a.alpha + (b.alpha - a.alpha) * local;
+          break;
+        }
+      }
+      const bandH = CANVAS_H / steps;
+      rects.push(
+        <Rect key={i} x={0} y={y} width={CANVAS_W} height={bandH + 1}
+          fill={`rgba(0,0,0,${alpha * o})`} listening={false} />
+      );
+    }
+    return rects;
+  };
+
   if (style === 'solid') {
+    return <Rect x={0} y={0} width={CANVAS_W} height={CANVAS_H}
+      fill={`rgba(0,0,0,${o})`} listening={false} />;
+  }
+  if (style === 'gradient-bottom') {
+    return <>{buildGradient([
+      { y: 0, alpha: 0 },
+      { y: CANVAS_H * 0.5, alpha: 0 },
+      { y: CANVAS_H, alpha: 1 },
+    ])}</>;
+  }
+  if (style === 'gradient-top') {
+    return <>{buildGradient([
+      { y: 0, alpha: 1 },
+      { y: CANVAS_H * 0.5, alpha: 0 },
+      { y: CANVAS_H, alpha: 0 },
+    ])}</>;
+  }
+  if (style === 'cinematic') {
+    return <>{buildGradient([
+      { y: 0, alpha: 0 },
+      { y: CANVAS_H * 0.4, alpha: 0 },
+      { y: CANVAS_H * 0.55, alpha: 0.15 },
+      { y: CANVAS_H * 0.7, alpha: 0.5 },
+      { y: CANVAS_H * 0.85, alpha: 0.8 },
+      { y: CANVAS_H, alpha: 0.95 },
+    ])}</>;
+  }
+  if (style === 'cinematic-soft') {
+    return <>{buildGradient([
+      { y: 0, alpha: 0 },
+      { y: CANVAS_H * 0.5, alpha: 0 },
+      { y: CANVAS_H * 0.7, alpha: 0.1 },
+      { y: CANVAS_H * 0.9, alpha: 0.5 },
+      { y: CANVAS_H, alpha: 0.7 },
+    ])}</>;
+  }
+  if (style === 'double') {
     return (
-      <Rect x={0} y={0} width={CANVAS_W} height={CANVAS_H}
-        fill={`rgba(0,0,0,${safeOpacity})`} listening={false} />
+      <>
+        <Rect x={0} y={0} width={CANVAS_W} height={CANVAS_H}
+          fill={`rgba(0,0,0,${0.18 * o})`} listening={false} />
+        {buildGradient([
+          { y: 0, alpha: 0 },
+          { y: CANVAS_H * 0.4, alpha: 0 },
+          { y: CANVAS_H * 0.55, alpha: 0.2 },
+          { y: CANVAS_H * 0.75, alpha: 0.55 },
+          { y: CANVAS_H, alpha: 1 },
+        ])}
+      </>
     );
   }
-  const steps = 20;
-  const dir = style === 'gradient-bottom' ? 'bottom' : 'top';
-  const rects = [];
-  for (let i = 0; i < steps; i++) {
-    const t = i / (steps - 1);
-    const bandHeight = CANVAS_H / steps;
-    const alpha = safeOpacity * Math.pow(t, 2.2);
-    const y = dir === 'bottom' ? CANVAS_H - bandHeight * (i + 1) : bandHeight * i;
-    rects.push(
-      <Rect key={i} x={0} y={y} width={CANVAS_W} height={bandHeight + 1}
-        fill={`rgba(0,0,0,${alpha})`} listening={false} />
+  if (style === 'vignette') {
+    return (
+      <>
+        {buildGradient([
+          { y: 0, alpha: 0.55 },
+          { y: CANVAS_H * 0.35, alpha: 0 },
+          { y: CANVAS_H * 0.65, alpha: 0 },
+          { y: CANVAS_H, alpha: 0.55 },
+        ])}
+        <Rect x={0} y={0} width={CANVAS_W * 0.25} height={CANVAS_H}
+          fill={`rgba(0,0,0,${0.35 * o})`} listening={false} opacity={0.6} />
+        <Rect x={CANVAS_W * 0.75} y={0} width={CANVAS_W * 0.25} height={CANVAS_H}
+          fill={`rgba(0,0,0,${0.35 * o})`} listening={false} opacity={0.6} />
+      </>
     );
   }
-  return <>{rects}</>;
+  if (style === 'bottom-half') {
+    return (
+      <Rect x={0} y={CANVAS_H * 0.5} width={CANVAS_W} height={CANVAS_H * 0.5}
+        fill={`rgba(0,0,0,${0.65 * o})`} listening={false} />
+    );
+  }
+  return null;
 }
 
 // ---------------- Headline ----------------
 function HighlightedHeadline({
-  config,
-  offsetY = 0,
+  config, offsetY = 0,
 }: {
   config: PostConfig;
   offsetY?: number;
@@ -386,9 +386,8 @@ function HighlightedHeadline({
 
   ctx.font = `bold ${safeFontSize}px ${safeFont}`;
 
-  const measureWord = (word: string) => {
-    return ctx.measureText(word).width + Math.max(0, word.length - 1) * letterSpacing;
-  };
+  const measureWord = (word: string) =>
+    ctx.measureText(word).width + Math.max(0, word.length - 1) * letterSpacing;
   const measureWordWithSpace = (word: string) => measureWord(word) + measureWord(' ');
 
   const words = upperText.split(' ');
@@ -438,8 +437,7 @@ function HighlightedHeadline({
         elements.push(
           <Text
             key={`${lineIdx}-${wordIdx}-${charIdx}`}
-            text={char}
-            x={x} y={y}
+            text={char} x={x} y={y}
             fontSize={safeFontSize}
             fontFamily={safeFont}
             fontStyle="bold"
@@ -457,7 +455,6 @@ function HighlightedHeadline({
         );
         x += measureWord(char) + letterSpacing;
       });
-
       if (wordIdx < lineWords.length - 1) {
         x += measureWord(' ') + letterSpacing;
       }
@@ -470,21 +467,20 @@ function HighlightedHeadline({
 
 // ---------------- Element Renderer ----------------
 function ElementRenderer({
-  element,
-  onChange,
-  onRequestImage,
+  element, onChange, onRequestImage, onRequestSplitImage,
 }: {
   element: CanvasElement;
   onChange: (patch: Partial<CanvasElement>) => void;
   onRequestImage: () => void;
+  onRequestSplitImage: (side: 'left' | 'right') => void;
 }) {
   const groupRef = useRef<Konva.Group>(null);
 
   useEffect(() => {
     if (!groupRef.current) return;
     const node = groupRef.current;
-    const w = node.width();
-    const h = node.height();
+    const w = node.width() || 60;
+    const h = node.height() || 30;
     const snap = snapPosition(element.snap, w, h);
     if (snap) {
       node.position({ x: snap.x * CANVAS_W, y: snap.y * CANVAS_H });
@@ -510,17 +506,15 @@ function ElementRenderer({
   const x = (element.x ?? 0) * CANVAS_W;
   const y = (element.y ?? 0) * CANVAS_H;
 
+  // ---- circleImage ----
   if (element.type === 'circleImage') {
     const size = (element.size ?? 0.22) * CANVAS_W;
     const hasImage = !!element.imageUrl;
     return (
-      <Group
-        ref={groupRef} x={x} y={y}
-        draggable={hasImage}
-        onDragEnd={handleDragEnd}
+      <Group ref={groupRef} x={x} y={y}
+        draggable={hasImage} onDragEnd={handleDragEnd}
         onClick={() => { if (!hasImage) onRequestImage(); }}
-        onTap={() => { if (!hasImage) onRequestImage(); }}
-      >
+        onTap={() => { if (!hasImage) onRequestImage(); }}>
         {hasImage ? (
           <CircleImage imageUrl={element.imageUrl} size={size} ringColor="#ffffff" />
         ) : (
@@ -529,32 +523,41 @@ function ElementRenderer({
               fill="rgba(255,255,255,0.15)" stroke="#ffffff" strokeWidth={2} dash={[8, 6]} />
             <Line points={[size * 0.35, size / 2, size * 0.65, size / 2]} stroke="#ffffff" strokeWidth={2} lineCap="round" />
             <Line points={[size / 2, size * 0.35, size / 2, size * 0.65]} stroke="#ffffff" strokeWidth={2} lineCap="round" />
-            <Text text="Tap to add" x={0} y={size + 6} width={size} align="center"
-              fontSize={10} fontFamily="Inter, system-ui, sans-serif" fill="#ffffff" opacity={0.9} />
           </>
         )}
       </Group>
     );
   }
 
+  // ---- splitImage — non-draggable so clicks land on halves ----
+  if (element.type === 'splitImage') {
+    return (
+      <Group ref={groupRef} x={x} y={y}>
+        <SplitImage element={element} onRequestSide={onRequestSplitImage} />
+      </Group>
+    );
+  }
+
+  // ---- logoPill ----
   if (element.type === 'logoPill') {
     const text = element.text ?? 'BRAND';
     const fSize = element.fontSize ?? 12;
-    const paddingX = 14;
-    const paddingY = 6;
-    const width = text.length * fSize * 0.6 + paddingX * 2;
-    const height = fSize + paddingY * 2;
+    const width = text.length * fSize * 0.6 + 28;
+    const height = fSize + 12;
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
-        <Rect x={0} y={0} width={width} height={height}
-          cornerRadius={height / 2} fill={element.bgColor ?? '#ef4444'} />
-        <Text text={text} x={0} y={paddingY} width={width} align="center"
+        <Rect x={0} y={0} width={width} height={height} cornerRadius={height / 2}
+          fill={element.bgColor ?? '#ef4444'} />
+        <Text
+          key={`pill-${text}-${fSize}`}
+          text={text} x={0} y={6} width={width} align="center"
           fontSize={fSize} fontFamily="Inter, system-ui, sans-serif"
           fontStyle="bold" fill={element.textColor ?? '#ffffff'} />
       </Group>
     );
   }
 
+  // ---- swipeArrow ----
   if (element.type === 'swipeArrow') {
     const size = (element.size ?? 0.08) * CANVAS_W;
     const r = size / 2;
@@ -567,7 +570,334 @@ function ElementRenderer({
     );
   }
 
+  // ---- headingNumber ----
+  if (element.type === 'headingNumber') {
+    const num = element.number ?? '01';
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <Text
+          key={`num-${num}-${element.fontSize}-${element.italic}`}
+          text={num} fontSize={element.fontSize ?? 90}
+          fontFamily={element.font ?? 'Georgia, serif'}
+          fontStyle={element.italic ? 'italic' : 'normal'}
+          fill={element.color ?? '#e07a3f'} />
+      </Group>
+    );
+  }
+
+  // ---- headingText ----
+  if (element.type === 'headingText') {
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <HeadingText element={element} />
+      </Group>
+    );
+  }
+
+  // ---- bodyText ----
+  if (element.type === 'bodyText') {
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <BodyText element={element} />
+      </Group>
+    );
+  }
+
+  // ---- attribution ----
+  if (element.type === 'attribution') {
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <Attribution element={element} />
+      </Group>
+    );
+  }
+
+  // ---- quoteMark ----
+  if (element.type === 'quoteMark') {
+    const c = element.char ?? '"';
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <Text
+          key={`qm-${c}-${element.fontSize}`}
+          text={c} fontSize={element.fontSize ?? 90}
+          fontFamily={element.font ?? 'Georgia, serif'}
+          fontStyle="bold"
+          fill={element.color ?? '#ffffff'} />
+      </Group>
+    );
+  }
+
+  // ---- card ----
+  if (element.type === 'card') {
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <CardRenderer element={element} />
+      </Group>
+    );
+  }
+
   return null;
+}
+
+// ---------------- SplitImage ----------------
+function SplitImage({
+  element, onRequestSide,
+}: {
+  element: SplitImageElement;
+  onRequestSide: (side: 'left' | 'right') => void;
+}) {
+  const width = (element.width ?? 1) * CANVAS_W;
+  const height = (element.height ?? 0.5) * CANVAS_H;
+  const ratio = element.splitRatio ?? 0.5;
+  const leftW = width * ratio;
+  const rightW = width - leftW;
+
+  const leftMissing = !element.leftImageUrl;
+  const rightMissing = !element.rightImageUrl;
+
+  return (
+    <>
+      {element.leftImageUrl ? (
+        <ImageWithCover
+          imageUrl={element.leftImageUrl}
+          x={0} y={0}
+          width={leftW} height={height}
+        />
+      ) : (
+        <Rect x={0} y={0} width={leftW} height={height} fill="#1a1a1a" />
+      )}
+
+      {element.rightImageUrl ? (
+        <ImageWithCover
+          imageUrl={element.rightImageUrl}
+          x={leftW} y={0}
+          width={rightW} height={height}
+        />
+      ) : (
+        <Rect x={leftW} y={0} width={rightW} height={height} fill="#1a1a1a" />
+      )}
+
+      {element.divider === 'line' && (
+        <Line points={[leftW, 0, leftW, height]}
+          stroke={element.dividerColor ?? '#ffffff'} strokeWidth={2} />
+      )}
+      {element.divider === 'gap' && (
+        <Rect x={leftW - 2} y={0} width={4} height={height} fill="rgba(0,0,0,0.6)" />
+      )}
+
+      {leftMissing && (
+        <>
+          <Text text="📸" x={0} y={height / 2 - 24} width={leftW} align="center"
+            fontSize={22} opacity={0.7} />
+          <Text text="Tap to add photo" x={0} y={height / 2 + 6} width={leftW} align="center"
+            fontSize={11} fontFamily="Inter, system-ui, sans-serif"
+            fill="#ffffff" opacity={0.9} />
+        </>
+      )}
+      {rightMissing && (
+        <>
+          <Text text="📸" x={leftW} y={height / 2 - 24} width={rightW} align="center"
+            fontSize={22} opacity={0.7} />
+          <Text text="Tap to add photo" x={leftW} y={height / 2 + 6} width={rightW} align="center"
+            fontSize={11} fontFamily="Inter, system-ui, sans-serif"
+            fill="#ffffff" opacity={0.9} />
+        </>
+      )}
+
+      {/* Clickable rects — using solid fill + opacity instead of rgba */}
+      <Rect
+        x={0}
+        y={0}
+        width={leftW}
+        height={height}
+        fill="#000000"
+        opacity={0.001}
+        onClick={() => onRequestSide('left')}
+        onTap={() => onRequestSide('left')}
+      />
+      <Rect
+        x={leftW}
+        y={0}
+        width={rightW}
+        height={height}
+        fill="#000000"
+        opacity={0.001}
+        onClick={() => onRequestSide('right')}
+        onTap={() => onRequestSide('right')}
+      />
+    </>
+  );
+}
+
+// ---------------- ImageWithCover ----------------
+function ImageWithCover({
+  imageUrl, x, y, width, height,
+}: {
+  imageUrl: string;
+  x: number; y: number;
+  width: number; height: number;
+}) {
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const i = new window.Image();
+    i.crossOrigin = 'anonymous';
+    i.src = imageUrl;
+    i.onload = () => setImg(i);
+  }, [imageUrl]);
+
+  if (!img) return <Rect x={x} y={y} width={width} height={height} fill="#1a1a1a" />;
+
+  const imgRatio = img.width / img.height;
+  const boxRatio = width / height;
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  if (imgRatio > boxRatio) {
+    sw = img.height * boxRatio;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / boxRatio;
+    sy = (img.height - sh) / 2;
+  }
+
+  return (
+    <KonvaImage
+      image={img}
+      crop={{ x: sx, y: sy, width: sw, height: sh }}
+      x={x} y={y} width={width} height={height}
+    />
+  );
+}
+
+// ---------------- HeadingText ----------------
+function HeadingText({ element }: { element: HeadingTextElement }) {
+  const w = (element.width ?? 0.85) * CANVAS_W;
+  const text = element.text ?? 'Headline here';
+  return (
+    <Text
+      key={`ht-${text}-${element.fontSize}-${element.color}-${element.bold}-${element.shadow}-${element.align}`}
+      text={text}
+      fontSize={element.fontSize ?? 34}
+      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fontStyle={element.bold === false ? 'normal' : 'bold'}
+      fill={element.color ?? '#1a1a1a'}
+      width={w}
+      lineHeight={element.lineHeight ?? 1.05}
+      align={element.align ?? 'left'}
+      shadowColor={element.shadow ? '#000000' : undefined}
+      shadowBlur={element.shadow ? 8 : 0}
+      shadowOffsetY={element.shadow ? 2 : 0}
+      shadowOpacity={element.shadow ? 0.6 : 0}
+    />
+  );
+}
+
+// ---------------- BodyText ----------------
+function BodyText({ element }: { element: BodyTextElement }) {
+  const w = (element.width ?? 0.85) * CANVAS_W;
+  const text = element.text ?? 'Body text goes here.';
+  return (
+    <Text
+      key={`bt-${text}-${element.fontSize}-${element.color}-${element.align}`}
+      text={text}
+      fontSize={element.fontSize ?? 14}
+      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fill={element.color ?? '#4a4a4a'}
+      width={w}
+      lineHeight={element.lineHeight ?? 1.4}
+      align={element.align ?? 'left'}
+    />
+  );
+}
+
+// ---------------- Attribution ----------------
+function Attribution({ element }: { element: AttributionElement }) {
+  const raw = element.text ?? '';
+  const text = (element.uppercase ?? false) ? raw.toUpperCase() : raw;
+  const w = (element.width ?? 0.85) * CANVAS_W;
+  return (
+    <Text
+      key={`at-${text}-${element.fontSize}-${element.color}-${element.align}-${element.bold}`}
+      text={text}
+      fontSize={element.fontSize ?? 12}
+      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fontStyle={element.bold === false ? 'normal' : 'bold'}
+      fill={element.color ?? '#ffffff'}
+      width={w}
+      align={element.align ?? 'left'}
+      letterSpacing={element.letterSpacing ?? 1}
+      opacity={0.9}
+    />
+  );
+}
+
+// ---------------- Card ----------------
+function CardRenderer({ element }: { element: CardElement }) {
+  const width = (element.width ?? 0.85) * CANVAS_W;
+  const PAD = 16;
+  const TITLE_SIZE = 16;
+  const SUB_SIZE = 11;
+  const STAT_SIZE = 12;
+  const STAT_LABEL_SIZE = 9;
+
+  const titleHeight = TITLE_SIZE * 1.3;
+  const subtitleHeight = SUB_SIZE * 1.4 * 2;
+  const statsHeight = 40;
+  const height = PAD + titleHeight + 6 + subtitleHeight + 10 + statsHeight + PAD + 4;
+
+  const bg = element.bgColor ?? '#ffffff';
+  const accent = element.accentColor ?? '#fbbf24';
+
+  const statsCount = Math.min(3, element.stats?.length ?? 0);
+  const statColW = (width - PAD * 2) / Math.max(1, statsCount);
+  const shadowEnabled = element.shadow !== false;
+
+  return (
+    <>
+      <Rect x={0} y={0} width={width} height={height}
+        cornerRadius={14} fill={bg}
+        shadowColor={shadowEnabled ? '#000' : undefined}
+        shadowBlur={shadowEnabled ? 12 : 0}
+        shadowOffsetY={shadowEnabled ? 4 : 0}
+        shadowOpacity={shadowEnabled ? 0.12 : 0} />
+      <Rect x={0} y={height - 5} width={width} height={5}
+        cornerRadius={[0, 0, 14, 14] as unknown as number} fill={accent} />
+      <Text
+        key={`card-title-${element.title}`}
+        text={element.title ?? 'Title'} x={PAD} y={PAD}
+        width={width - PAD * 2} fontSize={TITLE_SIZE}
+        fontFamily="Inter, system-ui, sans-serif" fontStyle="bold"
+        fill={element.titleColor ?? '#111111'} />
+      <Text
+        key={`card-sub-${element.subtitle}`}
+        text={element.subtitle ?? 'Subtitle goes here.'}
+        x={PAD} y={PAD + titleHeight + 4} width={width - PAD * 2}
+        fontSize={SUB_SIZE} fontFamily="Inter, system-ui, sans-serif"
+        fill={element.subtitleColor ?? '#666666'} lineHeight={1.35} />
+      {(element.stats ?? []).slice(0, 3).map((stat, i) => {
+        const sx = PAD + i * statColW;
+        const sy = height - PAD - statsHeight + 4;
+        return (
+          <Group key={i} x={sx} y={sy}>
+            <Text
+              key={`stat-icon-${i}-${stat.icon}`}
+              text={stat.icon ?? '★'} x={0} y={0} fontSize={STAT_SIZE + 1}
+              fontFamily="Inter, system-ui, sans-serif"
+              fill={element.titleColor ?? '#111111'} />
+            <Text
+              key={`stat-val-${i}-${stat.value}`}
+              text={stat.value ?? '—'} x={16} y={-2}
+              fontSize={STAT_SIZE} fontFamily="Inter, system-ui, sans-serif"
+              fontStyle="bold" fill={element.titleColor ?? '#111111'} />
+            <Text
+              key={`stat-lbl-${i}-${stat.label}`}
+              text={stat.label ?? ''} x={16} y={STAT_SIZE + 1}
+              fontSize={STAT_LABEL_SIZE}
+              fontFamily="Inter, system-ui, sans-serif"
+              fill={element.subtitleColor ?? '#888888'} />
+          </Group>
+        );
+      })}
+    </>
+  );
 }
 
 // ---------------- Circle image ----------------
