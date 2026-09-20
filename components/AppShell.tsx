@@ -85,12 +85,13 @@ export default function AppShell() {
         >
           <Header />
           <main
-            className="flex-1 overflow-y-auto no-scrollbar pb-28"
+            className="flex-1 overflow-y-auto no-scrollbar pb-28 screen-in"
             style={{ background: 'var(--bg)' }}
           >
             {tab === 'home' && (
               <HomeScreen
                 onNewPost={() => openEditor()}
+                onPickTemplate={(id) => openEditor(id)}
                 refreshKey={refreshKey}
               />
             )}
@@ -121,15 +122,11 @@ export default function AppShell() {
           className="pointer-events-none fixed inset-0 opacity-60"
           style={{ background: 'var(--bg-gradient)' }}
         />
-
-        {/* Floating top dock */}
         <DesktopSidebar
           active={tab}
           onChange={setTab}
           onCreate={() => openEditor()}
         />
-
-        {/* Content — note the pt-24 to leave room for the dock */}
         <div className="relative z-10 pt-24 pb-12">
           {tab === 'home' && (
             <DesktopHome

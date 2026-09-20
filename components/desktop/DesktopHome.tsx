@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react';
 import { getPosts, type SavedPost } from '@/lib/storage';
 import { TEMPLATES, type TemplateId } from '@/lib/templates';
+import { DEFAULT_CONFIG } from '@/lib/types';
+import TemplatePreview from '../TemplatePreview';
 
 type Props = {
   onCreate: () => void;
@@ -119,15 +121,7 @@ export default function DesktopHome({
                 color: 'var(--accent-fg)',
               }}
             >
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </div>
@@ -152,10 +146,7 @@ export default function DesktopHome({
                 {slideCount > 1 && (
                   <span
                     className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{
-                      background: 'rgba(0,0,0,0.6)',
-                      color: '#fff',
-                    }}
+                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
                   >
                     {slideCount} slides
                   </span>
@@ -187,17 +178,26 @@ export default function DesktopHome({
             <button
               key={t.id}
               onClick={() => onPickTemplate(t.id)}
-              className="aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-3 cursor-pointer transition hover:scale-[1.02] active:scale-95"
+              className="rounded-3xl flex flex-col items-center gap-3 cursor-pointer transition hover:scale-[1.02] active:scale-95 p-3"
               style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
             >
-              <span className="text-4xl">{t.emoji}</span>
-              <span className="text-sm font-medium">{t.name}</span>
-              <span
-                className="text-[10px] px-3 text-center"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                {t.tagline}
-              </span>
+              <TemplatePreview
+                templateId={t.id}
+                baseConfig={DEFAULT_CONFIG}
+                width={200}
+              />
+              <div className="text-center">
+                <p className="text-sm font-semibold flex items-center justify-center gap-1.5">
+                  <span>{t.emoji}</span>
+                  <span>{t.name}</span>
+                </p>
+                <p
+                  className="text-[10px] mt-1 line-clamp-2"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {t.tagline}
+                </p>
+              </div>
             </button>
           ))}
         </div>

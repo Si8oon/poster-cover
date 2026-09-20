@@ -16,6 +16,7 @@ import {
   type SplitImageElement,
 } from '@/lib/types';
 import { TEMPLATES, getTemplate, type TemplateId } from '@/lib/templates';
+import TemplatePreview from '../TemplatePreview';
 
 const PostCanvas = dynamic(() => import('./PostCanvas'), {
   ssr: false,
@@ -61,10 +62,6 @@ export default function EditorScreen({
   onClose, onSaved, initialTemplate, editingPostId, initialSlides,
 }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
-
-  // ---------- File input refs ----------
-  // We keep these as physical elements in the DOM (not display:none)
-  // so iOS Safari can open them within a user gesture.
   const bgInputRef = useRef<HTMLInputElement>(null);
   const elementImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,10 +133,8 @@ export default function EditorScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides.length]);
 
-  // ---------- Background upload ----------
   const [bgFile, setBgFile] = useState<File | null>(null);
 
-  // Synchronous click — important for mobile
   const openBgPicker = () => {
     bgInputRef.current?.click();
   };
@@ -156,11 +151,9 @@ export default function EditorScreen({
         });
       reader.readAsDataURL(file);
     }
-    // Reset so the same file can be picked again
     e.target.value = '';
   };
 
-  // ---------- Templates ----------
   const [activeTemplate, setActiveTemplate] = useState<TemplateId | null>(
     initialTemplate ?? null
   );
@@ -181,7 +174,6 @@ export default function EditorScreen({
     );
   };
 
-  // ---------- Add elements ----------
   const addElement = (type: CanvasElement['type']) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     let el: CanvasElement;
@@ -262,8 +254,6 @@ export default function EditorScreen({
     });
   };
 
-  // ---------- Image pickers ----------
-  // These are triggered SYNCHRONOUSLY by user gestures (important for mobile)
   const handleRequestImage = (elementId: string) => {
     pendingElementIdRef.current = elementId;
     pendingSplitSideRef.current = null;
@@ -305,7 +295,6 @@ export default function EditorScreen({
     e.target.value = '';
   };
 
-  // ---------- Fallback buttons (mobile-friendly) ----------
   const hasSplitImage = currentSlide.elements.some((e) => e.type === 'splitImage');
   const splitEl = currentSlide.elements.find((e) => e.type === 'splitImage') as
     | SplitImageElement
@@ -315,7 +304,6 @@ export default function EditorScreen({
     (e) => e.type === 'circleImage' && !(e as { imageUrl?: string }).imageUrl
   );
 
-  // ---------- Tabs / save ----------
   const [tab, setTab] = useState<Tab>('template');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -370,35 +358,19 @@ export default function EditorScreen({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col slide-up" style={{ background: 'var(--bg)' }}>
-      {/* ---------- Hidden inputs (visible to DOM, invisible to eye) ---------- */}
-      {/* NOT using `display: none` — iOS Safari refuses those for file pickers */}
       <input
         ref={bgInputRef}
         type="file"
         accept="image/*"
         onChange={handleBgChange}
-        style={{
-          position: 'fixed',
-          left: -9999,
-          top: -9999,
-          width: 1,
-          height: 1,
-          opacity: 0,
-        }}
+        style={{ position: 'fixed', left: -9999, top: -9999, width: 1, height: 1, opacity: 0 }}
       />
       <input
         ref={elementImageInputRef}
         type="file"
         accept="image/*"
         onChange={handleElementImagePicked}
-        style={{
-          position: 'fixed',
-          left: -9999,
-          top: -9999,
-          width: 1,
-          height: 1,
-          opacity: 0,
-        }}
+        style={{ position: 'fixed', left: -9999, top: -9999, width: 1, height: 1, opacity: 0 }}
       />
 
       <header className="flex items-center justify-between px-4 py-3 shrink-0"
@@ -448,11 +420,7 @@ export default function EditorScreen({
                 slideIndex={currentIndex} slideCount={slides.length} />
             </div>
 
-            {/* ---------- MOBILE FALLBACK UPLOAD BUTTONS ---------- */}
-            {/* These appear right below the canvas so mobile users always have
-                an obvious way to add photos, even if canvas taps fail */}
             <div className="w-full max-w-[432px] flex flex-col gap-2">
-              {/* Background fallback (always shown) */}
               <button
                 type="button"
                 onClick={openBgPicker}
@@ -466,37 +434,28 @@ export default function EditorScreen({
                 📸 {bgFile ? 'Change background photo' : 'Upload background photo'}
               </button>
 
-              {/* Split image fallbacks (only when split image exists) */}
               {hasSplitImage && splitEl && (
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      handleSplitImageRequest(splitEl.id, 'left')
-                    }
+                    onClick={() => handleSplitImageRequest(splitEl.id, 'left')}
                     className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
                     style={{
                       background: 'var(--card)',
                       border: '1px dashed var(--border)',
-                      color: splitEl.leftImageUrl
-                        ? 'var(--accent)'
-                        : 'var(--text)',
+                      color: splitEl.leftImageUrl ? 'var(--accent)' : 'var(--text)',
                     }}
                   >
                     🖼️ {splitEl.leftImageUrl ? 'Change left photo' : 'Add left photo'}
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      handleSplitImageRequest(splitEl.id, 'right')
-                    }
+                    onClick={() => handleSplitImageRequest(splitEl.id, 'right')}
                     className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
                     style={{
                       background: 'var(--card)',
                       border: '1px dashed var(--border)',
-                      color: splitEl.rightImageUrl
-                        ? 'var(--accent)'
-                        : 'var(--text)',
+                      color: splitEl.rightImageUrl ? 'var(--accent)' : 'var(--text)',
                     }}
                   >
                     🖼️ {splitEl.rightImageUrl ? 'Change right photo' : 'Add right photo'}
@@ -504,7 +463,6 @@ export default function EditorScreen({
                 </div>
               )}
 
-              {/* Circle image fallback */}
               {hasCircleImage && (
                 <button
                   type="button"
@@ -576,23 +534,50 @@ export default function EditorScreen({
             </div>
 
             {tab === 'template' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {TEMPLATES.map((t) => {
                   const isActive = activeTemplate === t.id;
                   return (
-                    <button key={t.id} onClick={() => applyTemplate(t.id)}
-                      className="p-3 rounded-2xl text-left transition active:scale-[0.98]"
+                    <button
+                      key={t.id}
+                      onClick={() => applyTemplate(t.id)}
+                      className="p-3 rounded-2xl text-left transition active:scale-[0.98] flex gap-3"
                       style={{
                         background: isActive ? 'var(--card-hover)' : 'var(--card)',
                         border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                      }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xl">{t.emoji}</span>
-                        <span className="text-sm font-semibold">{t.name}</span>
+                      }}
+                    >
+                      <div className="shrink-0">
+                        <TemplatePreview
+                          templateId={t.id}
+                          baseConfig={currentSlide}
+                          width={72}
+                        />
                       </div>
-                      <p className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>
-                        {t.tagline}
-                      </p>
+
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{t.emoji}</span>
+                          <span className="text-sm font-semibold truncate">{t.name}</span>
+                          {isActive && (
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0"
+                              style={{
+                                background: 'var(--accent)',
+                                color: 'var(--accent-fg)',
+                              }}
+                            >
+                              ON
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className="text-[10px] leading-tight mt-1 line-clamp-2"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {t.tagline}
+                        </p>
+                      </div>
                     </button>
                   );
                 })}
@@ -1022,7 +1007,6 @@ function MiniColorRow({
   );
 }
 
-// ---------- Element controls ----------
 function ElementControls({
   element, onChange, onRemove, onRequestImage, onSplitImageRequest,
 }: {
@@ -1202,7 +1186,6 @@ function ElementControls({
   );
 }
 
-// ---------- SplitImage controls ----------
 function SplitImageControls({
   element, onChange, onRequestImage,
 }: {
@@ -1259,7 +1242,6 @@ function SplitImageControls({
   );
 }
 
-// ---------- Card controls ----------
 function CardControls({
   element, onChange,
 }: {

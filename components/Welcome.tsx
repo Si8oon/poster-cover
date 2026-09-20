@@ -52,7 +52,6 @@ export default function Welcome({ onDone }: Props) {
       className="fixed inset-0 z-[100] flex flex-col overflow-hidden fade-in"
       style={{ background: 'var(--bg)' }}
     >
-      {/* Sky gradient background */}
       <div
         className="absolute inset-0 transition-all duration-700"
         style={{
@@ -60,7 +59,6 @@ export default function Welcome({ onDone }: Props) {
         }}
       />
 
-      {/* Sun */}
       <div className="pointer-events-none absolute top-10 right-12">
         <div
           className="w-24 h-24 rounded-full blur-md opacity-80"
@@ -72,14 +70,12 @@ export default function Welcome({ onDone }: Props) {
         />
       </div>
 
-      {/* Clouds */}
       <Cloud top="8%" left="5%" scale={1} delay={0} direction="right" />
       <Cloud top="14%" right="8%" scale={0.8} delay={1.5} direction="left" />
       <Cloud top="22%" left="20%" scale={0.6} delay={3} direction="right" />
       <Cloud bottom="18%" right="10%" scale={1.1} delay={2} direction="left" />
       <Cloud bottom="24%" left="8%" scale={0.7} delay={0.5} direction="right" />
 
-      {/* Sparkles */}
       <div className="pointer-events-none absolute inset-0">
         {[
           { top: '18%', left: '14%', delay: 0 },
@@ -107,14 +103,12 @@ export default function Welcome({ onDone }: Props) {
         ))}
       </div>
 
-      {/* Butterflies / birds */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute top-[24%] left-[30%] text-2xl float opacity-70">🦋</div>
         <div className="absolute top-[60%] right-[22%] text-xl float-slow opacity-60">🌸</div>
         <div className="absolute bottom-[26%] left-[24%] text-xl bob opacity-70">🌷</div>
       </div>
 
-      {/* Skip */}
       <div className="relative z-10 flex justify-end p-4">
         <button
           onClick={onDone}
@@ -125,10 +119,8 @@ export default function Welcome({ onDone }: Props) {
         </button>
       </div>
 
-      {/* Content */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 text-center max-w-lg mx-auto w-full">
         <div key={step} className="fade-up flex flex-col items-center">
-          {/* Main icon with animated gradient bg + glow */}
           <div className="relative mb-10">
             <div
               className="absolute inset-0 rounded-[2rem] blur-2xl opacity-60"
@@ -151,7 +143,7 @@ export default function Welcome({ onDone }: Props) {
 
           <h1
             className="text-3xl sm:text-4xl font-bold leading-tight max-w-md"
-            style={{ color: '#1e293b', textWrap: 'balance' } as React.CSSProperties}
+            style={{ color: '#1e293b' }}
           >
             {current.title}
           </h1>
@@ -164,7 +156,6 @@ export default function Welcome({ onDone }: Props) {
         </div>
       </div>
 
-      {/* Dots + buttons */}
       <div className="relative z-10 flex flex-col items-center gap-6 pb-12 px-8 w-full max-w-md mx-auto">
         <div className="flex gap-2">
           {slides.map((_, i) => (
@@ -209,7 +200,6 @@ export default function Welcome({ onDone }: Props) {
   );
 }
 
-/* Cloud component */
 function Cloud({
   top,
   left,
@@ -241,7 +231,6 @@ function Cloud({
       }}
     >
       <div className="relative">
-        {/* Cloud made of overlapping circles */}
         <div className="w-24 h-10 bg-white rounded-full shadow-sm" />
         <div className="absolute -top-3 left-3 w-14 h-14 bg-white rounded-full" />
         <div className="absolute -top-5 left-9 w-20 h-20 bg-white rounded-full" />
