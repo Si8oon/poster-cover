@@ -78,7 +78,7 @@ const PHOTO_NEWS = `data:image/svg+xml;utf8,${encodeURIComponent(`
 `)}`;
 
 /**
- * Returns a base PostConfig populated with realistic sample content,
+ * Returns a base PostConfig populated with fictional sample content,
  * designed to render beautifully as a preview thumbnail.
  */
 export function getPreviewConfig(templateId: string, current: PostConfig): PostConfig {
@@ -98,8 +98,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         backgroundImage: PHOTO_1,
-        headline: 'COLLEGE DEGREES CONSIDERED SAFEST FROM AI',
-        highlightWord: 'DEGREES',
+        headline: 'BIG IDEAS SHAPING THE FUTURE OF WORK',
+        highlightWord: 'FUTURE',
         font: 'Impact, "Arial Black", sans-serif',
         fontSize: 30,
         textColor: '#ffffff',
@@ -116,8 +116,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         backgroundImage: PHOTO_NEWS,
-        headline: 'APPLE iPHONE DUO VS SAMSUNG GALAXY Z FOLD',
-        highlightWord: 'DUO',
+        headline: 'SMARTPHONE SHOWDOWN 2026 — THE FOLD IS BACK',
+        highlightWord: 'FOLD',
         font: 'Impact, "Arial Black", sans-serif',
         fontSize: 26,
         textColor: '#ffffff',
@@ -138,8 +138,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         backgroundImage: PHOTO_2,
-        headline: 'THEY RUNNING OUTTA CHARACTERS, HAD TO BRING BACK UP KAEP AGAIN',
-        highlightWord: 'KAEP',
+        headline: 'IDEAS BECOME POWERFUL WHEN YOU SHIP THEM',
+        highlightWord: 'POWERFUL',
         font: 'Georgia, serif',
         fontSize: 22,
         textColor: '#ffffff',
@@ -159,8 +159,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         backgroundImage: PHOTO_2,
-        headline: 'SHATTA WALE DISCLOSES HE HAS OVER 11,000 SONGS',
-        highlightWord: '11,000',
+        headline: 'THE STORY EVERYONE IS TALKING ABOUT THIS WEEK',
+        highlightWord: 'TALKING',
         font: 'Impact, "Arial Black", sans-serif',
         fontSize: 22,
         textColor: '#ffffff',
@@ -211,9 +211,9 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         },
         elements: [
           { id: 'pv-ed-num', type: 'headingNumber', x: 0.06, y: 0.16, number: '01', fontSize: 60, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' },
-          { id: 'pv-ed-head', type: 'headingText', x: 0.28, y: 0.2, text: 'The spy satellite in your browser.', fontSize: 20, color: '#111111', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.66, align: 'left', shadow: false, snap: 'free' },
-          { id: 'pv-ed-body', type: 'bodyText', x: 0.06, y: 0.42, text: 'A photorealistic 3D globe streaming live aircraft, ships, and cameras.', fontSize: 10, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.88, align: 'left', snap: 'free' },
-          { id: 'pv-ed-card', type: 'card', x: 0.06, y: 0.68, width: 0.88, title: 'bilawalsidhu/gods-eye', subtitle: 'Photorealistic 3D globe. Live aircraft, ships and cameras.', stats: [ { icon: '★', value: '10.5k', label: 'Stars' }, { icon: '⑂', value: '2.2k', label: 'Forks' }, { icon: '◎', value: '88', label: 'Issues' } ], bgColor: '#ffffff', titleColor: '#111111', subtitleColor: '#666666', accentColor: '#fbbf24', shadow: true, snap: 'free' },
+          { id: 'pv-ed-head', type: 'headingText', x: 0.28, y: 0.2, text: 'The quiet app taking over your browser.', fontSize: 20, color: '#111111', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.66, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-ed-body', type: 'bodyText', x: 0.06, y: 0.42, text: 'A tiny tool that streams live flights, ships, and cameras into one clean 3D view.', fontSize: 10, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.88, align: 'left', snap: 'free' },
+          { id: 'pv-ed-card', type: 'card', x: 0.06, y: 0.68, width: 0.88, title: 'username/project-name', subtitle: 'A short description of what this thing is and why it matters.', stats: [ { icon: '★', value: '10.5k', label: 'Stars' }, { icon: '⑂', value: '2.2k', label: 'Forks' }, { icon: '◎', value: '88', label: 'Issues' } ], bgColor: '#ffffff', titleColor: '#111111', subtitleColor: '#666666', accentColor: '#fbbf24', shadow: true, snap: 'free' },
         ],
       };
 
@@ -230,10 +230,10 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
           textColor: '#1a1a1a',
         },
         elements: [
-          { id: 'pv-ec-tag', type: 'bodyText', x: 0.08, y: 0.14, text: 'TRENDING · WEEK OF AUG 28', fontSize: 9, color: '#e07a3f', font: 'Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
+          { id: 'pv-ec-tag', type: 'bodyText', x: 0.08, y: 0.14, text: 'TRENDING · THIS WEEK', fontSize: 9, color: '#e07a3f', font: 'Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
           { id: 'pv-ec-num', type: 'headingNumber', x: 0.08, y: 0.24, number: '5', fontSize: 110, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' },
-          { id: 'pv-ec-head', type: 'headingText', x: 0.32, y: 0.3, text: 'GitHub repos that cooked this week', fontSize: 24, color: '#111111', font: 'Georgia, serif', lineHeight: 1.05, bold: false, width: 0.6, align: 'left', shadow: false, snap: 'free' },
-          { id: 'pv-ec-sub', type: 'bodyText', x: 0.08, y: 0.78, text: 'and which ones I would use', fontSize: 13, color: '#4a4a4a', font: 'Georgia, serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
+          { id: 'pv-ec-head', type: 'headingText', x: 0.32, y: 0.3, text: 'Things that happened this week', fontSize: 24, color: '#111111', font: 'Georgia, serif', lineHeight: 1.05, bold: false, width: 0.6, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-ec-sub', type: 'bodyText', x: 0.08, y: 0.78, text: 'and which ones actually matter', fontSize: 13, color: '#4a4a4a', font: 'Georgia, serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
         ],
       };
 
@@ -265,8 +265,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         elements: [
           { id: 'pv-sq-split', type: 'splitImage', x: 0, y: 0, width: 1, height: 0.62, leftImageUrl: PHOTO_2, rightImageUrl: PHOTO_1, splitRatio: 0.5, divider: 'none', dividerColor: '#ffffff', snap: 'free' },
           { id: 'pv-sq-qm', type: 'quoteMark', x: 0.055, y: 0.48, char: '“', fontSize: 80, color: '#ffffff', font: 'Georgia, serif', snap: 'free' },
-          { id: 'pv-sq-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THEY RUNNING OUTTA CHARACTERS, HAD TO BRING BACK UP KAEP AGAIN…', fontSize: 22, color: '#ffffff', font: 'Inter, system-ui, sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
-          { id: 'pv-sq-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-JAY-Z, YANKEE STADIUM FREESTYLE', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
+          { id: 'pv-sq-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST IDEAS COME FROM PEOPLE WHO SHIP EVERY DAY.', fontSize: 22, color: '#ffffff', font: 'Inter, system-ui, sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-sq-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, EVENT (YEAR)', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
         ],
       };
 
@@ -277,8 +277,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         overlayOpacity: 1,
         elements: [
           { id: 'pv-sqd-split', type: 'splitImage', x: 0, y: 0, width: 1, height: 0.58, leftImageUrl: PHOTO_2, rightImageUrl: PHOTO_3, splitRatio: 0.5, divider: 'gap', dividerColor: '#ffffff', snap: 'free' },
-          { id: 'pv-sqd-head', type: 'headingText', x: 0.055, y: 0.62, text: 'YOUR BIG QUOTE GOES RIGHT HERE.', fontSize: 24, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.1, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
-          { id: 'pv-sqd-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, SOURCE (2026)', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
+          { id: 'pv-sqd-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST STORIES START WITH A SINGLE LINE.', fontSize: 24, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.1, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-sqd-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, SOURCE (YEAR)', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
         ],
       };
 
@@ -291,7 +291,7 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         align: 'left',
         elements: [
           { id: 'pv-mem-circle', type: 'circleImage', x: 0.06, y: 0.3, size: 0.3, imageUrl: PHOTO_3, snap: 'free' },
-          { id: 'pv-mem-head', type: 'headingText', x: 0.055, y: 0.62, text: 'HAPPY BIRTHDAY TO THE LATE JAMES GANDOLFINI', fontSize: 20, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-mem-head', type: 'headingText', x: 0.055, y: 0.62, text: 'HAPPY BIRTHDAY TO SOMEONE GREAT — WE MISS YOU EVERY DAY', fontSize: 20, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
           { id: 'pv-mem-attr', type: 'attribution', x: 0.055, y: 0.93, text: 'SWIPE FOR MORE', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 1.5, uppercase: true, bold: true, width: 0.89, align: 'center', snap: 'free' },
         ],
       };
