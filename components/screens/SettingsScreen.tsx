@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { THEMES } from '@/lib/themes';
 import { useTheme } from '@/lib/useTheme';
+import { useUser } from '@/lib/useUser';
 import {
   clearPosts,
   clearWelcomeFlag,
@@ -16,9 +17,17 @@ type Props = {
   onResetWelcome?: () => void;
 };
 
+const MOTION_LABEL: Record<string, string> = {
+  none: 'Still',
+  breathing: 'Breathing motion',
+  floating: 'Floating motion',
+};
+
 export default function SettingsScreen({ onResetWelcome }: Props) {
   const { theme, setTheme } = useTheme();
+  const { name, setName } = useUser();
   const [toast, setToast] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState(name);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -56,6 +65,11 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
     }, 800);
   };
 
+  const saveName = () => {
+    setName(draftName);
+    showToast('Name saved');
+  };
+
   const summary = getStorageSummary();
 
   return (
@@ -65,7 +79,45 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         Make it yours
       </p>
 
-      {/* ---------- THEME ---------- */}
+      <section className="mt-8">
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider mb-3"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Your name
+        </h3>
+        <div
+          className="rounded-2xl p-3 flex gap-2"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <input
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveName();
+            }}
+            placeholder="Enter your name"
+            maxLength={30}
+            className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+            }}
+          />
+          <button
+            onClick={saveName}
+            className="px-4 rounded-xl text-xs font-semibold active:scale-95 transition"
+            style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+          >
+            Save
+          </button>
+        </div>
+        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+          Used to greet you on the home screen
+        </p>
+      </section>
+
       <section className="mt-8">
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
@@ -73,10 +125,16 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         >
           Theme
         </h3>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+          Each theme also sets a default motion for new posts
+        </p>
 
         <div className="space-y-3">
           {THEMES.map((t) => {
             const isActive = theme === t.id;
+            const motionLabel = MOTION_LABEL[t.defaultMotion.type] ?? 'Still';
+            const hasMotion = t.defaultMotion.type !== 'none';
+
             return (
               <button
                 key={t.id}
@@ -90,7 +148,7 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">{t.emoji}</span>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{t.name}</p>
                       {isActive && (
                         <span
@@ -110,6 +168,18 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
                     >
                       {t.tagline}
                     </p>
+                    {hasMotion && (
+                      <p
+                        className="text-[10px] mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+                        style={{
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        🎬 {motionLabel}
+                      </p>
+                    )}
                   </div>
                 </div>
               </button>
@@ -118,7 +188,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         </div>
       </section>
 
-      {/* ---------- ONBOARDING ---------- */}
       <section className="mt-8">
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
@@ -140,7 +209,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         </div>
       </section>
 
-      {/* ---------- DATA ---------- */}
       <section className="mt-8">
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
@@ -149,7 +217,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
           Your data
         </h3>
 
-        {/* Summary card */}
         <div
           className="rounded-2xl p-4 mb-3 grid grid-cols-2 gap-3 text-xs"
           style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
@@ -168,7 +235,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         />
       </section>
 
-      {/* ---------- DANGER ZONE ---------- */}
       <section className="mt-8">
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
@@ -193,7 +259,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
         </button>
       </section>
 
-      {/* ---------- ABOUT ---------- */}
       <section className="mt-8">
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
@@ -206,14 +271,13 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
           style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
         >
           <p style={{ color: 'var(--text-muted)' }}>
-            Version 0.2 — Built with Next.js, Konva, Tailwind.
+            Version 0.3 — Built with Next.js, Konva, Tailwind.
           </p>
         </div>
       </section>
 
-      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 fade-in">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 toast-in">
           <div
             className="px-5 py-3 rounded-2xl text-sm font-medium shadow-lg"
             style={{
@@ -229,8 +293,6 @@ export default function SettingsScreen({ onResetWelcome }: Props) {
     </div>
   );
 }
-
-// ---------- Small helpers ----------
 
 function SettingButton({
   title,
@@ -270,7 +332,10 @@ function SettingButton({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+      <p
+        className="text-[10px] uppercase tracking-wider"
+        style={{ color: 'var(--text-muted)' }}
+      >
         {label}
       </p>
       <p className="text-sm font-semibold mt-0.5 capitalize">{value}</p>

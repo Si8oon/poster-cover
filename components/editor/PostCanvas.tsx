@@ -11,8 +11,9 @@ import {
   Circle,
   Line,
   Image as KonvaImage,
+  Path,
 } from 'react-konva';
-import type Konva from 'konva';
+import Konva from 'konva';
 import type {
   CanvasElement,
   PostConfig,
@@ -23,6 +24,7 @@ import type {
   HeadingTextElement,
   BodyTextElement,
   AttributionElement,
+  CrownElement,
 } from '@/lib/types';
 import { konvaFontFamily } from '@/lib/fonts';
 
@@ -37,6 +39,7 @@ type Props = {
   onRequestSplitImage?: (elementId: string, side: 'left' | 'right') => void;
   slideIndex?: number;
   slideCount?: number;
+  disableMotion?: boolean;
 };
 
 const SNAP_MARGIN = 24;
@@ -58,6 +61,126 @@ function snapPosition(snap: SnapPosition, w: number, h: number) {
   }
 }
 
+function useMotion(
+  config: PostConfig,
+  layerRef: React.RefObject<Konva.Layer | null>,
+  elementRefs: React.MutableRefObject<Map<string, Konva.Group>>,
+  disableMotion?: boolean
+) {
+  const animRef = useRef<any>(null);
+  const motion = config.motion;
+  const elementsCount = config.elements.length;
+
+  useEffect(() => {
+    if (animRef.current) {
+      animRef.current.stop();
+      animRef.current = null;
+    }
+
+    if (disableMotion) return;
+    if (!motion || motion.type === 'none') return;
+    if (!layerRef.current) return;
+
+    const speed = motion.speed || 1;
+    const intensity = motion.intensity || 1;
+    const elements = config.elements;
+
+    const originals = new Map<string, {
+      x: number; y: number; scaleX: number; scaleY: number; rotation: number; opacity: number;
+    }>();
+
+    elements.forEach((el) => {
+      const node = elementRefs.current.get(el.id);
+      if (!node) return;
+      originals.set(el.id, {
+        x: node.x(),
+        y: node.y(),
+        scaleX: node.scaleX(),
+        scaleY: node.scaleY(),
+        rotation: node.rotation(),
+        opacity: node.opacity(),
+      });
+    });
+
+    const timeStart = performance.now();
+    const KonvaAny = Konva as any;
+
+    const animFn = (frame: any) => {
+      const now = frame && typeof frame.time === 'number' ? frame.time : performance.now();
+      const t = ((now - timeStart) / 1000) * speed;
+
+      elements.forEach((el) => {
+        const node = elementRefs.current.get(el.id);
+        const orig = originals.get(el.id);
+        if (!node || !orig) return;
+
+        if (motion.type === 'breathing') {
+          const wave = Math.sin((t * Math.PI * 2) / 3);
+          const amt = wave * 0.05 * intensity;
+
+          if (el.type === 'crown' || el.type === 'logoPill' || el.type === 'circleImage') {
+            node.scaleX(orig.scaleX * (1 + amt));
+            node.scaleY(orig.scaleY * (1 + amt));
+          } else if (el.type === 'tag' || el.type === 'crossout' || el.type === 'swipeArrow') {
+            node.rotation(orig.rotation + wave * 1.5 * intensity);
+          } else if (el.type === 'quoteMark') {
+            node.opacity(
+              Math.max(0.6, orig.opacity - (1 - Math.cos((t * Math.PI * 2) / 3)) * 0.15 * intensity)
+            );
+          } else {
+            node.scaleX(orig.scaleX * (1 + amt * 0.5));
+            node.scaleY(orig.scaleY * (1 + amt * 0.5));
+          }
+        } else if (motion.type === 'floating') {
+          const phase = (t * Math.PI * 2) / 5;
+          const driftY = Math.sin(phase) * 8 * intensity;
+          const driftX = Math.cos(phase * 0.7) * 3 * intensity;
+          const rotWave = Math.sin(phase * 0.5) * 3 * intensity;
+
+          if (
+            el.type === 'crown' ||
+            el.type === 'tag' ||
+            el.type === 'circleImage' ||
+            el.type === 'logoPill' ||
+            el.type === 'quoteMark' ||
+            el.type === 'swipeArrow'
+          ) {
+            node.y(orig.y + driftY);
+            node.x(orig.x + driftX);
+          }
+
+          if (el.type === 'crown' || el.type === 'tag') {
+            node.rotation(orig.rotation + rotWave);
+          }
+
+          if (el.type === 'crossout') {
+            node.x(orig.x + Math.sin(phase) * 3 * intensity);
+          }
+        }
+      });
+    };
+
+    const anim = new KonvaAny.Animation(animFn, layerRef.current);
+    anim.start();
+    animRef.current = anim;
+
+    return () => {
+      anim.stop();
+      animRef.current = null;
+      originals.forEach((orig, id) => {
+        const node = elementRefs.current.get(id);
+        if (!node) return;
+        node.x(orig.x);
+        node.y(orig.y);
+        node.scaleX(orig.scaleX);
+        node.scaleY(orig.scaleY);
+        node.rotation(orig.rotation);
+        node.opacity(orig.opacity);
+      });
+    };
+  }, [motion.type, motion.speed, motion.intensity, disableMotion, elementsCount]);
+}
+
 export default function PostCanvas({
   config,
   onChange,
@@ -66,19 +189,21 @@ export default function PostCanvas({
   onRequestSplitImage,
   slideIndex = 0,
   slideCount = 1,
+  disableMotion = false,
 }: Props) {
+  const layerRef = useRef<Konva.Layer | null>(null);
+  const elementRefs = useRef<Map<string, Konva.Group>>(new Map());
+
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [bgProps, setBgProps] = useState<{
     x: number; y: number; width: number; height: number;
   } | null>(null);
 
-  // Warm font cache on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Ensure the fonts are loaded before Konva draws
-    if ((document as Document & { fonts?: FontFaceSet }).fonts) {
-      (document as Document & { fonts: FontFaceSet }).fonts.ready.then(() => {
-        // Force a redraw after fonts are ready
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    if (fonts) {
+      fonts.ready.then(() => {
         stageRef.current?.batchDraw();
       });
     }
@@ -111,6 +236,8 @@ export default function PostCanvas({
     };
   }, [config.backgroundImage]);
 
+  useMotion(config, layerRef, elementRefs, disableMotion);
+
   const updateElement = (id: string, patch: Partial<CanvasElement>) => {
     const next = config.elements.map((el) =>
       el.id === id ? ({ ...el, ...patch } as CanvasElement) : el
@@ -118,12 +245,17 @@ export default function PostCanvas({
     onChange({ elements: next });
   };
 
+  const registerRef = (id: string, node: Konva.Group | null) => {
+    if (node) elementRefs.current.set(id, node);
+    else elementRefs.current.delete(id);
+  };
+
   const headerOffset = config.header?.enabled ? HEADER_H : 0;
   const showEmptyHint = !config.backgroundImage && config.paperBg === 'none';
 
   return (
     <Stage ref={stageRef} width={CANVAS_W} height={CANVAS_H}>
-      <Layer>
+      <Layer ref={layerRef}>
         {config.paperBg !== 'none' && <PaperBackground type={config.paperBg} />}
 
         {!bgImage && config.paperBg === 'none' && (
@@ -133,10 +265,8 @@ export default function PostCanvas({
         {bgImage && bgProps && (
           <KonvaImage
             image={bgImage}
-            x={bgProps.x}
-            y={bgProps.y}
-            width={bgProps.width}
-            height={bgProps.height}
+            x={bgProps.x} y={bgProps.y}
+            width={bgProps.width} height={bgProps.height}
             listening={false}
           />
         )}
@@ -165,6 +295,7 @@ export default function PostCanvas({
           <ElementRenderer
             key={el.id}
             element={el}
+            onRefReady={(node) => registerRef(el.id, node)}
             onChange={(patch) => updateElement(el.id, patch)}
             onRequestImage={() => onRequestImage(el.id)}
             onRequestSplitImage={(side) =>
@@ -291,34 +422,25 @@ function Overlay({
   }
   if (style === 'gradient-bottom') {
     return <>{buildGradient([
-      { y: 0, alpha: 0 },
-      { y: CANVAS_H * 0.5, alpha: 0 },
-      { y: CANVAS_H, alpha: 1 },
+      { y: 0, alpha: 0 }, { y: CANVAS_H * 0.5, alpha: 0 }, { y: CANVAS_H, alpha: 1 },
     ])}</>;
   }
   if (style === 'gradient-top') {
     return <>{buildGradient([
-      { y: 0, alpha: 1 },
-      { y: CANVAS_H * 0.5, alpha: 0 },
-      { y: CANVAS_H, alpha: 0 },
+      { y: 0, alpha: 1 }, { y: CANVAS_H * 0.5, alpha: 0 }, { y: CANVAS_H, alpha: 0 },
     ])}</>;
   }
   if (style === 'cinematic') {
     return <>{buildGradient([
-      { y: 0, alpha: 0 },
-      { y: CANVAS_H * 0.4, alpha: 0 },
-      { y: CANVAS_H * 0.55, alpha: 0.15 },
-      { y: CANVAS_H * 0.7, alpha: 0.5 },
-      { y: CANVAS_H * 0.85, alpha: 0.8 },
-      { y: CANVAS_H, alpha: 0.95 },
+      { y: 0, alpha: 0 }, { y: CANVAS_H * 0.4, alpha: 0 },
+      { y: CANVAS_H * 0.55, alpha: 0.15 }, { y: CANVAS_H * 0.7, alpha: 0.5 },
+      { y: CANVAS_H * 0.85, alpha: 0.8 }, { y: CANVAS_H, alpha: 0.95 },
     ])}</>;
   }
   if (style === 'cinematic-soft') {
     return <>{buildGradient([
-      { y: 0, alpha: 0 },
-      { y: CANVAS_H * 0.5, alpha: 0 },
-      { y: CANVAS_H * 0.7, alpha: 0.1 },
-      { y: CANVAS_H * 0.9, alpha: 0.5 },
+      { y: 0, alpha: 0 }, { y: CANVAS_H * 0.5, alpha: 0 },
+      { y: CANVAS_H * 0.7, alpha: 0.1 }, { y: CANVAS_H * 0.9, alpha: 0.5 },
       { y: CANVAS_H, alpha: 0.7 },
     ])}</>;
   }
@@ -328,10 +450,8 @@ function Overlay({
         <Rect x={0} y={0} width={CANVAS_W} height={CANVAS_H}
           fill={`rgba(0,0,0,${0.18 * o})`} listening={false} />
         {buildGradient([
-          { y: 0, alpha: 0 },
-          { y: CANVAS_H * 0.4, alpha: 0 },
-          { y: CANVAS_H * 0.55, alpha: 0.2 },
-          { y: CANVAS_H * 0.75, alpha: 0.55 },
+          { y: 0, alpha: 0 }, { y: CANVAS_H * 0.4, alpha: 0 },
+          { y: CANVAS_H * 0.55, alpha: 0.2 }, { y: CANVAS_H * 0.75, alpha: 0.55 },
           { y: CANVAS_H, alpha: 1 },
         ])}
       </>
@@ -341,10 +461,8 @@ function Overlay({
     return (
       <>
         {buildGradient([
-          { y: 0, alpha: 0.55 },
-          { y: CANVAS_H * 0.35, alpha: 0 },
-          { y: CANVAS_H * 0.65, alpha: 0 },
-          { y: CANVAS_H, alpha: 0.55 },
+          { y: 0, alpha: 0.55 }, { y: CANVAS_H * 0.35, alpha: 0 },
+          { y: CANVAS_H * 0.65, alpha: 0 }, { y: CANVAS_H, alpha: 0.55 },
         ])}
         <Rect x={0} y={0} width={CANVAS_W * 0.25} height={CANVAS_H}
           fill={`rgba(0,0,0,${0.35 * o})`} listening={false} opacity={0.6} />
@@ -480,12 +598,13 @@ function HighlightedHeadline({
 
 // ---------------- Element Renderer ----------------
 function ElementRenderer({
-  element, onChange, onRequestImage, onRequestSplitImage,
+  element, onChange, onRequestImage, onRequestSplitImage, onRefReady,
 }: {
   element: CanvasElement;
   onChange: (patch: Partial<CanvasElement>) => void;
   onRequestImage: () => void;
   onRequestSplitImage: (side: 'left' | 'right') => void;
+  onRefReady: (node: Konva.Group | null) => void;
 }) {
   const groupRef = useRef<Konva.Group>(null);
 
@@ -505,6 +624,12 @@ function ElementRenderer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [element.snap]);
+
+  useEffect(() => {
+    onRefReady(groupRef.current);
+    return () => onRefReady(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDragEnd = () => {
     const node = groupRef.current;
@@ -558,8 +683,7 @@ function ElementRenderer({
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
         <Rect x={0} y={0} width={width} height={height} cornerRadius={height / 2}
           fill={element.bgColor ?? '#ef4444'} />
-        <Text
-          key={`pill-${text}-${fSize}`}
+        <Text key={`pill-${text}-${fSize}`}
           text={text} x={0} y={6} width={width} align="center"
           fontSize={fSize} fontFamily="Inter, system-ui, sans-serif"
           fontStyle="bold" fill={element.textColor ?? '#ffffff'} />
@@ -623,8 +747,7 @@ function ElementRenderer({
     const family = konvaFontFamily(element.font ?? 'Georgia, serif');
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
-        <Text
-          key={`qm-${c}-${element.fontSize}-${family}`}
+        <Text key={`qm-${c}-${element.fontSize}-${family}`}
           text={c} fontSize={element.fontSize ?? 90}
           fontFamily={family}
           fontStyle="bold"
@@ -637,6 +760,56 @@ function ElementRenderer({
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
         <CardRenderer element={element} />
+      </Group>
+    );
+  }
+
+  if (element.type === 'crossout') {
+    const width = (element.width ?? 0.5) * CANVAS_W;
+    const thickness = element.height ?? 4;
+    return (
+      <Group
+        ref={groupRef}
+        x={x} y={y}
+        draggable
+        onDragEnd={handleDragEnd}
+        rotation={element.rotation ?? 0}
+      >
+        <Rect
+          x={0} y={0}
+          width={width} height={thickness}
+          fill={element.color ?? '#dc2626'}
+          cornerRadius={thickness / 2}
+        />
+      </Group>
+    );
+  }
+
+  if (element.type === 'crown') {
+    return (
+      <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
+        <Crown element={element} />
+      </Group>
+    );
+  }
+
+  if (element.type === 'tag') {
+    const family = konvaFontFamily(element.font ?? 'var(--font-permanent-marker), cursive');
+    return (
+      <Group
+        ref={groupRef}
+        x={x} y={y}
+        draggable
+        onDragEnd={handleDragEnd}
+        rotation={element.rotation ?? 0}
+      >
+        <Text
+          key={`tag-${element.text}-${element.fontSize}-${family}`}
+          text={element.text ?? 'tag'}
+          fontSize={element.fontSize ?? 14}
+          fontFamily={family}
+          fill={element.color ?? '#111111'}
+        />
       </Group>
     );
   }
@@ -656,7 +829,6 @@ function SplitImage({
   const ratio = element.splitRatio ?? 0.5;
   const leftW = width * ratio;
   const rightW = width - leftW;
-
   const leftMissing = !element.leftImageUrl;
   const rightMissing = !element.rightImageUrl;
 
@@ -667,13 +839,11 @@ function SplitImage({
       ) : (
         <Rect x={0} y={0} width={leftW} height={height} fill="#1a1a1a" />
       )}
-
       {element.rightImageUrl ? (
         <ImageWithCover imageUrl={element.rightImageUrl} x={leftW} y={0} width={rightW} height={height} />
       ) : (
         <Rect x={leftW} y={0} width={rightW} height={height} fill="#1a1a1a" />
       )}
-
       {element.divider === 'line' && (
         <Line points={[leftW, 0, leftW, height]}
           stroke={element.dividerColor ?? '#ffffff'} strokeWidth={2} />
@@ -681,11 +851,9 @@ function SplitImage({
       {element.divider === 'gap' && (
         <Rect x={leftW - 2} y={0} width={4} height={height} fill="rgba(0,0,0,0.6)" />
       )}
-
       {leftMissing && (
         <>
-          <Text text="📸" x={0} y={height / 2 - 24} width={leftW} align="center"
-            fontSize={22} opacity={0.7} />
+          <Text text="📸" x={0} y={height / 2 - 24} width={leftW} align="center" fontSize={22} opacity={0.7} />
           <Text text="Tap to add photo" x={0} y={height / 2 + 6} width={leftW} align="center"
             fontSize={11} fontFamily="Inter, system-ui, sans-serif"
             fill="#ffffff" opacity={0.9} />
@@ -693,14 +861,12 @@ function SplitImage({
       )}
       {rightMissing && (
         <>
-          <Text text="📸" x={leftW} y={height / 2 - 24} width={rightW} align="center"
-            fontSize={22} opacity={0.7} />
+          <Text text="📸" x={leftW} y={height / 2 - 24} width={rightW} align="center" fontSize={22} opacity={0.7} />
           <Text text="Tap to add photo" x={leftW} y={height / 2 + 6} width={rightW} align="center"
             fontSize={11} fontFamily="Inter, system-ui, sans-serif"
             fill="#ffffff" opacity={0.9} />
         </>
       )}
-
       <Rect x={0} y={0} width={leftW} height={height}
         fill="#000000" opacity={0.001}
         onClick={() => onRequestSide('left')}
@@ -710,6 +876,42 @@ function SplitImage({
         onClick={() => onRequestSide('right')}
         onTap={() => onRequestSide('right')} />
     </>
+  );
+}
+
+// ---------------- Crown ----------------
+function Crown({ element }: { element: CrownElement }) {
+  const size = (element.size ?? 0.25) * CANVAS_W;
+  const fill = element.color ?? '#fbbf24';
+  const strokeColor = element.strokeColor ?? '#000000';
+  const strokeWidth = element.strokeWidth ?? 3;
+  const pathData = 'M 5 55 L 5 25 L 25 38 L 50 10 L 75 38 L 95 25 L 95 55 Z';
+
+  if (element.style === 'outline') {
+    return (
+      <Path
+        data={pathData}
+        x={0} y={0}
+        scaleX={size / 100}
+        scaleY={size / 100}
+        stroke={strokeColor}
+        strokeWidth={strokeWidth / (size / 100)}
+        fillEnabled={false}
+      />
+    );
+  }
+
+  return (
+    <Path
+      data={pathData}
+      x={0} y={0}
+      scaleX={size / 100}
+      scaleY={size / 100}
+      fill={fill}
+      stroke={strokeColor}
+      strokeWidth={strokeWidth / (size / 100)}
+      lineJoin="round"
+    />
   );
 }
 
@@ -743,11 +945,8 @@ function ImageWithCover({
   }
 
   return (
-    <KonvaImage
-      image={img}
-      crop={{ x: sx, y: sy, width: sw, height: sh }}
-      x={x} y={y} width={width} height={height}
-    />
+    <KonvaImage image={img} crop={{ x: sx, y: sy, width: sw, height: sh }}
+      x={x} y={y} width={width} height={height} />
   );
 }
 

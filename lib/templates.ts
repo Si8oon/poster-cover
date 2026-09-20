@@ -12,7 +12,10 @@ export type TemplateId =
   | 'editorialOutro'
   | 'splitQuote'
   | 'splitQuoteDark'
-  | 'memorial';
+  | 'memorial'
+  | 'basquiatYellow'
+  | 'basquiatRed'
+  | 'basquiatBlue';
 
 export type Template = {
   id: TemplateId;
@@ -131,8 +134,6 @@ export const TEMPLATES: Template[] = [
       { id: nid(), type: 'logoPill', x: 0, y: 0, text: '</>', bgColor: '#22c55e', textColor: '#000000', fontSize: 12, snap: 'top-left' },
     ],
   },
-
-  // ---------- Editorial set ----------
   {
     id: 'editorial',
     name: 'Editorial',
@@ -146,14 +147,7 @@ export const TEMPLATES: Template[] = [
       overlayStyle: 'none',
       overlayOpacity: 0,
       textY: 1,
-      header: {
-        enabled: true,
-        handle: '@yourhandle',
-        showCounter: true,
-        showProgress: true,
-        accentColor: '#e07a3f',
-        textColor: '#1a1a1a',
-      },
+      header: { enabled: true, handle: '@yourhandle', showCounter: true, showProgress: true, accentColor: '#e07a3f', textColor: '#1a1a1a' },
     },
     elements: [
       { id: nid(), type: 'headingNumber', x: 0.06, y: 0.16, number: '01', fontSize: 72, color: '#e07a3f', font: 'var(--font-playfair), Georgia, serif', italic: true, snap: 'free' },
@@ -175,14 +169,7 @@ export const TEMPLATES: Template[] = [
       overlayStyle: 'none',
       overlayOpacity: 0,
       textY: 0.4,
-      header: {
-        enabled: true,
-        handle: '@yourhandle',
-        showCounter: false,
-        showProgress: false,
-        accentColor: '#e07a3f',
-        textColor: '#1a1a1a',
-      },
+      header: { enabled: true, handle: '@yourhandle', showCounter: false, showProgress: false, accentColor: '#e07a3f', textColor: '#1a1a1a' },
     },
     elements: [
       { id: nid(), type: 'bodyText', x: 0.1, y: 0.18, text: 'TRENDING · THIS WEEK', fontSize: 11, color: '#e07a3f', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.8, align: 'left', snap: 'free' },
@@ -204,14 +191,7 @@ export const TEMPLATES: Template[] = [
       overlayStyle: 'none',
       overlayOpacity: 0,
       textY: 1,
-      header: {
-        enabled: true,
-        handle: '@yourhandle',
-        showCounter: true,
-        showProgress: true,
-        accentColor: '#e07a3f',
-        textColor: '#1a1a1a',
-      },
+      header: { enabled: true, handle: '@yourhandle', showCounter: true, showProgress: true, accentColor: '#e07a3f', textColor: '#1a1a1a' },
     },
     elements: [
       { id: nid(), type: 'headingText', x: 0.1, y: 0.28, text: 'That’s a wrap.', fontSize: 42, color: '#111111', font: 'var(--font-playfair), Georgia, serif', lineHeight: 1.05, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
@@ -219,8 +199,6 @@ export const TEMPLATES: Template[] = [
       { id: nid(), type: 'logoPill', x: 0, y: 0, text: '★  SAVE FOR LATER', bgColor: '#e07a3f', textColor: '#ffffff', fontSize: 12, snap: 'bottom-center' },
     ],
   },
-
-  // ---------- Split quote ----------
   {
     id: 'splitQuote',
     name: 'Split Quote ⭐',
@@ -307,6 +285,371 @@ export const TEMPLATES: Template[] = [
       { id: nid(), type: 'circleImage', x: 0.06, y: 0.35, size: 0.3, imageUrl: '', snap: 'free' },
       { id: nid(), type: 'headingText', x: 0.055, y: 0.6, text: 'HAPPY BIRTHDAY TO SOMEONE GREAT — WE MISS YOU EVERY DAY', fontSize: 24, color: '#ffffff', font: 'var(--font-bebas), Impact, "Arial Narrow", sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
       { id: nid(), type: 'attribution', x: 0.055, y: 0.93, text: 'SWIPE FOR MORE', fontSize: 12, color: '#ffffff', font: 'var(--font-outfit), Inter, system-ui, sans-serif', letterSpacing: 1.5, uppercase: true, bold: true, width: 0.89, align: 'center', snap: 'free' },
+    ],
+  },
+
+  // =========================================================
+  //  BASQUIAT SET — inspired by neo-expressionist street art
+  // =========================================================
+
+  {
+    id: 'basquiatYellow',
+    name: 'Neo Yellow',
+    emoji: '👑',
+    tagline: 'Yellow crown, black scrawl, raw canvas.',
+    config: {
+      backgroundImage: null,
+      paperBg: 'cream',
+      headline: '',
+      highlightWord: '',
+      font: 'var(--font-permanent-marker), "Comic Sans MS", cursive',
+      fontSize: 28,
+      textColor: '#111111',
+      highlightColor: '#dc2626',
+      align: 'left',
+      uppercase: false,
+      letterSpacing: 0,
+      textY: 1,
+      textStroke: { color: '#000000', width: 0 },
+      textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
+      overlayStyle: 'none',
+      overlayOpacity: 0,
+      header: { enabled: false, handle: '@yourhandle', showCounter: false, showProgress: false, accentColor: '#fbbf24', textColor: '#111111' },
+    },
+    elements: [
+      // Crown at the top
+      {
+        id: nid(), type: 'crown',
+        x: 0.05, y: 0.06,
+        size: 0.22,
+        color: '#fbbf24',
+        strokeColor: '#111111',
+        strokeWidth: 4,
+        style: 'solid',
+        snap: 'free',
+      },
+      // Small tag top-right
+      {
+        id: nid(), type: 'tag',
+        x: 0.68, y: 0.08,
+        text: '© 2026',
+        fontSize: 14,
+        color: '#111111',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: -3,
+        snap: 'free',
+      },
+      // Main scrawled headline
+      {
+        id: nid(), type: 'headingText',
+        x: 0.06, y: 0.32,
+        text: 'MAKE IT LOUD.',
+        fontSize: 44,
+        color: '#111111',
+        font: 'var(--font-permanent-marker), "Comic Sans MS", cursive',
+        lineHeight: 1.05,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        shadow: false,
+        snap: 'free',
+      },
+      // Cross-out bar (Basquiat loved crossing-out words)
+      {
+        id: nid(), type: 'crossout',
+        x: 0.15, y: 0.42,
+        width: 0.55,
+        height: 5,
+        color: '#dc2626',
+        rotation: -2,
+        snap: 'free',
+      },
+      // Second line in bigger scrawl
+      {
+        id: nid(), type: 'headingText',
+        x: 0.06, y: 0.48,
+        text: 'THEN MAKE IT LOUDER.',
+        fontSize: 36,
+        color: '#111111',
+        font: 'var(--font-permanent-marker), "Comic Sans MS", cursive',
+        lineHeight: 1.05,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        shadow: false,
+        snap: 'free',
+      },
+      // Body text below in small handwriting
+      {
+        id: nid(), type: 'bodyText',
+        x: 0.06, y: 0.68,
+        text: 'Not for sale. Not for critics. Just for the people who get it.',
+        fontSize: 14,
+        color: '#1a1a1a',
+        font: 'var(--font-caveat-brush), cursive',
+        lineHeight: 1.3,
+        width: 0.88,
+        align: 'left',
+        snap: 'free',
+      },
+      // Bottom tag
+      {
+        id: nid(), type: 'tag',
+        x: 0.06, y: 0.9,
+        text: '5¢',
+        fontSize: 16,
+        color: '#dc2626',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: 2,
+        snap: 'free',
+      },
+      // Bottom-right crown outline
+      {
+        id: nid(), type: 'crown',
+        x: 0.78, y: 0.86,
+        size: 0.12,
+        color: 'transparent',
+        strokeColor: '#111111',
+        strokeWidth: 3,
+        style: 'outline',
+        snap: 'free',
+      },
+    ],
+  },
+
+  {
+    id: 'basquiatRed',
+    name: 'Neo Red',
+    emoji: '✏️',
+    tagline: 'Red anger, crossed-out words, raw.',
+    config: {
+      backgroundImage: null,
+      paperBg: 'cream',
+      headline: '',
+      highlightWord: '',
+      font: 'var(--font-rock-salt), cursive',
+      fontSize: 26,
+      textColor: '#111111',
+      highlightColor: '#dc2626',
+      align: 'left',
+      uppercase: false,
+      letterSpacing: 0,
+      textY: 1,
+      textStroke: { color: '#000000', width: 0 },
+      textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
+      overlayStyle: 'none',
+      overlayOpacity: 0,
+      header: { enabled: false, handle: '@yourhandle', showCounter: false, showProgress: false, accentColor: '#dc2626', textColor: '#111111' },
+    },
+    elements: [
+      // Big red crown outline at top
+      {
+        id: nid(), type: 'crown',
+        x: 0.55, y: 0.06,
+        size: 0.28,
+        color: 'transparent',
+        strokeColor: '#dc2626',
+        strokeWidth: 5,
+        style: 'outline',
+        snap: 'free',
+      },
+      // Hand-scrawled intro
+      {
+        id: nid(), type: 'tag',
+        x: 0.06, y: 0.08,
+        text: 'listen,',
+        fontSize: 18,
+        color: '#111111',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: -4,
+        snap: 'free',
+      },
+      // Crossed-out first line
+      {
+        id: nid(), type: 'headingText',
+        x: 0.06, y: 0.22,
+        text: 'BE NICE',
+        fontSize: 40,
+        color: '#111111',
+        font: 'var(--font-rock-salt), cursive',
+        lineHeight: 1.05,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        shadow: false,
+        snap: 'free',
+      },
+      {
+        id: nid(), type: 'crossout',
+        x: 0.06, y: 0.28,
+        width: 0.4,
+        height: 6,
+        color: '#dc2626',
+        rotation: -3,
+        snap: 'free',
+      },
+      // Big red "MAKE NOISE"
+      {
+        id: nid(), type: 'headingText',
+        x: 0.06, y: 0.4,
+        text: 'MAKE NOISE.',
+        fontSize: 48,
+        color: '#dc2626',
+        font: 'var(--font-permanent-marker), "Comic Sans MS", cursive',
+        lineHeight: 1.02,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        shadow: false,
+        snap: 'free',
+      },
+      // Small body text
+      {
+        id: nid(), type: 'bodyText',
+        x: 0.06, y: 0.62,
+        text: 'Nobody remembers the people who stayed quiet.',
+        fontSize: 15,
+        color: '#1a1a1a',
+        font: 'var(--font-caveat-brush), cursive',
+        lineHeight: 1.3,
+        width: 0.88,
+        align: 'left',
+        snap: 'free',
+      },
+      // Copyright tag
+      {
+        id: nid(), type: 'tag',
+        x: 0.06, y: 0.9,
+        text: '© 2026 · NOT FOR SALE',
+        fontSize: 11,
+        color: '#111111',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: -1,
+        snap: 'free',
+      },
+      // Small yellow crown accent bottom-right
+      {
+        id: nid(), type: 'crown',
+        x: 0.82, y: 0.86,
+        size: 0.1,
+        color: '#fbbf24',
+        strokeColor: '#111111',
+        strokeWidth: 3,
+        style: 'solid',
+        snap: 'free',
+      },
+    ],
+  },
+
+  {
+    id: 'basquiatBlue',
+    name: 'Neo Blue',
+    emoji: '🌊',
+    tagline: 'Blue reflection, calm scrawl, thinker energy.',
+    config: {
+      backgroundImage: null,
+      paperBg: 'cream',
+      headline: '',
+      highlightWord: '',
+      font: 'var(--font-caveat-brush), cursive',
+      fontSize: 28,
+      textColor: '#111111',
+      highlightColor: '#1d4ed8',
+      align: 'left',
+      uppercase: false,
+      letterSpacing: 0,
+      textY: 1,
+      textStroke: { color: '#000000', width: 0 },
+      textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
+      overlayStyle: 'none',
+      overlayOpacity: 0,
+      header: { enabled: false, handle: '@yourhandle', showCounter: false, showProgress: false, accentColor: '#1d4ed8', textColor: '#111111' },
+    },
+    elements: [
+      // Blue crown at top-left
+      {
+        id: nid(), type: 'crown',
+        x: 0.06, y: 0.08,
+        size: 0.18,
+        color: '#1d4ed8',
+        strokeColor: '#111111',
+        strokeWidth: 3,
+        style: 'solid',
+        snap: 'free',
+      },
+      // Top-right date tag
+      {
+        id: nid(), type: 'tag',
+        x: 0.7, y: 0.1,
+        text: '03.20.26',
+        fontSize: 12,
+        color: '#1d4ed8',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: 2,
+        snap: 'free',
+      },
+      // Quote mark in blue
+      {
+        id: nid(), type: 'quoteMark',
+        x: 0.06, y: 0.24,
+        char: '“',
+        fontSize: 90,
+        color: '#1d4ed8',
+        font: 'var(--font-playfair), Georgia, serif',
+        snap: 'free',
+      },
+      // Big blue quote
+      {
+        id: nid(), type: 'headingText',
+        x: 0.06, y: 0.42,
+        text: 'I DON’T LISTEN TO WHAT ART CRITICS SAY.',
+        fontSize: 26,
+        color: '#111111',
+        font: 'var(--font-caveat-brush), cursive',
+        lineHeight: 1.15,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        shadow: false,
+        snap: 'free',
+      },
+      // Attribution
+      {
+        id: nid(), type: 'attribution',
+        x: 0.06, y: 0.72,
+        text: '— just look at what I see.',
+        fontSize: 15,
+        color: '#1d4ed8',
+        font: 'var(--font-caveat-brush), cursive',
+        letterSpacing: 0.5,
+        uppercase: false,
+        bold: false,
+        width: 0.88,
+        align: 'left',
+        snap: 'free',
+      },
+      // Bottom-right tag
+      {
+        id: nid(), type: 'tag',
+        x: 0.78, y: 0.9,
+        text: '© sameness',
+        fontSize: 11,
+        color: '#111111',
+        font: 'var(--font-rock-salt), cursive',
+        rotation: -2,
+        snap: 'free',
+      },
+      // Outline crown bottom
+      {
+        id: nid(), type: 'crown',
+        x: 0.5, y: 0.88,
+        size: 0.08,
+        color: 'transparent',
+        strokeColor: '#1d4ed8',
+        strokeWidth: 3,
+        style: 'outline',
+        snap: 'free',
+      },
     ],
   },
 ];

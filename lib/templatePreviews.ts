@@ -1,10 +1,6 @@
 // lib/templatePreviews.ts
-import type { PostConfig, CanvasElement } from './types';
+import type { PostConfig } from './types';
 
-/**
- * Sample SVG data URLs used as preview photos.
- * They look like real photos but weigh almost nothing.
- */
 const PHOTO_1 = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500">
   <defs>
@@ -70,17 +66,9 @@ const PHOTO_NEWS = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <rect x="210" y="100" width="130" height="220" rx="18" fill="#1e293b" stroke="#334155" stroke-width="2"/>
   <circle cx="105" cy="150" r="18" fill="#0ea5e9"/>
   <circle cx="255" cy="150" r="18" fill="#e2e8f0"/>
-  <rect x="75" y="200" width="100" height="8" rx="4" fill="#334155"/>
-  <rect x="225" y="200" width="100" height="8" rx="4" fill="#334155"/>
-  <rect x="75" y="220" width="80" height="8" rx="4" fill="#334155"/>
-  <rect x="225" y="220" width="80" height="8" rx="4" fill="#334155"/>
 </svg>
 `)}`;
 
-/**
- * Returns a base PostConfig populated with fictional sample content,
- * designed to render beautifully as a preview thumbnail.
- */
 export function getPreviewConfig(templateId: string, current: PostConfig): PostConfig {
   const base: PostConfig = {
     ...current,
@@ -93,14 +81,13 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
   };
 
   switch (templateId) {
-    // ---------------- CLASSIC ----------------
     case 'forbes':
       return {
         ...base,
         backgroundImage: PHOTO_1,
         headline: 'BIG IDEAS SHAPING THE FUTURE OF WORK',
         highlightWord: 'FUTURE',
-        font: 'Impact, "Arial Black", sans-serif',
+        font: 'var(--font-anton), Impact, "Arial Black", sans-serif',
         fontSize: 30,
         textColor: '#ffffff',
         highlightColor: '#00d97e',
@@ -118,7 +105,7 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         backgroundImage: PHOTO_NEWS,
         headline: 'SMARTPHONE SHOWDOWN 2026 — THE FOLD IS BACK',
         highlightWord: 'FOLD',
-        font: 'Impact, "Arial Black", sans-serif',
+        font: 'var(--font-archivo-black), "Arial Black", sans-serif',
         fontSize: 26,
         textColor: '#ffffff',
         highlightColor: '#fbbf24',
@@ -140,7 +127,7 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         backgroundImage: PHOTO_2,
         headline: 'IDEAS BECOME POWERFUL WHEN YOU SHIP THEM',
         highlightWord: 'POWERFUL',
-        font: 'Georgia, serif',
+        font: 'var(--font-playfair), Georgia, serif',
         fontSize: 22,
         textColor: '#ffffff',
         highlightColor: '#fbbf24',
@@ -161,7 +148,7 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         backgroundImage: PHOTO_2,
         headline: 'THE STORY EVERYONE IS TALKING ABOUT THIS WEEK',
         highlightWord: 'TALKING',
-        font: 'Impact, "Arial Black", sans-serif',
+        font: 'var(--font-archivo-black), "Arial Black", sans-serif',
         fontSize: 22,
         textColor: '#ffffff',
         highlightColor: '#fbbf24',
@@ -182,7 +169,7 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         ...base,
         backgroundImage: PHOTO_DARK,
         headline: 'npm install && npm run dev',
-        font: '"Courier New", monospace',
+        font: 'var(--font-jetbrains-mono), "Courier New", monospace',
         fontSize: 20,
         textColor: '#22ff22',
         highlightColor: '#ffffff',
@@ -196,23 +183,15 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         ],
       };
 
-    // ---------------- EDITORIAL ----------------
     case 'editorial':
       return {
         ...base,
         paperBg: 'grid',
-        header: {
-          enabled: true,
-          handle: '@yourhandle',
-          showCounter: true,
-          showProgress: true,
-          accentColor: '#e07a3f',
-          textColor: '#1a1a1a',
-        },
+        header: { enabled: true, handle: '@yourhandle', showCounter: true, showProgress: true, accentColor: '#e07a3f', textColor: '#1a1a1a' },
         elements: [
-          { id: 'pv-ed-num', type: 'headingNumber', x: 0.06, y: 0.16, number: '01', fontSize: 60, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' },
-          { id: 'pv-ed-head', type: 'headingText', x: 0.28, y: 0.2, text: 'The quiet app taking over your browser.', fontSize: 20, color: '#111111', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.66, align: 'left', shadow: false, snap: 'free' },
-          { id: 'pv-ed-body', type: 'bodyText', x: 0.06, y: 0.42, text: 'A tiny tool that streams live flights, ships, and cameras into one clean 3D view.', fontSize: 10, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.88, align: 'left', snap: 'free' },
+          { id: 'pv-ed-num', type: 'headingNumber', x: 0.06, y: 0.16, number: '01', fontSize: 60, color: '#e07a3f', font: 'var(--font-playfair), Georgia, serif', italic: true, snap: 'free' },
+          { id: 'pv-ed-head', type: 'headingText', x: 0.28, y: 0.2, text: 'The quiet app taking over your browser.', fontSize: 20, color: '#111111', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.66, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-ed-body', type: 'bodyText', x: 0.06, y: 0.42, text: 'A tiny tool that streams live flights, ships, and cameras into one clean 3D view.', fontSize: 10, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.88, align: 'left', snap: 'free' },
           { id: 'pv-ed-card', type: 'card', x: 0.06, y: 0.68, width: 0.88, title: 'username/project-name', subtitle: 'A short description of what this thing is and why it matters.', stats: [ { icon: '★', value: '10.5k', label: 'Stars' }, { icon: '⑂', value: '2.2k', label: 'Forks' }, { icon: '◎', value: '88', label: 'Issues' } ], bgColor: '#ffffff', titleColor: '#111111', subtitleColor: '#666666', accentColor: '#fbbf24', shadow: true, snap: 'free' },
         ],
       };
@@ -221,19 +200,12 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         paperBg: 'cream',
-        header: {
-          enabled: true,
-          handle: '@yourhandle',
-          showCounter: false,
-          showProgress: false,
-          accentColor: '#e07a3f',
-          textColor: '#1a1a1a',
-        },
+        header: { enabled: true, handle: '@yourhandle', showCounter: false, showProgress: false, accentColor: '#e07a3f', textColor: '#1a1a1a' },
         elements: [
-          { id: 'pv-ec-tag', type: 'bodyText', x: 0.08, y: 0.14, text: 'TRENDING · THIS WEEK', fontSize: 9, color: '#e07a3f', font: 'Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
-          { id: 'pv-ec-num', type: 'headingNumber', x: 0.08, y: 0.24, number: '5', fontSize: 110, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' },
-          { id: 'pv-ec-head', type: 'headingText', x: 0.32, y: 0.3, text: 'Things that happened this week', fontSize: 24, color: '#111111', font: 'Georgia, serif', lineHeight: 1.05, bold: false, width: 0.6, align: 'left', shadow: false, snap: 'free' },
-          { id: 'pv-ec-sub', type: 'bodyText', x: 0.08, y: 0.78, text: 'and which ones actually matter', fontSize: 13, color: '#4a4a4a', font: 'Georgia, serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
+          { id: 'pv-ec-tag', type: 'bodyText', x: 0.08, y: 0.14, text: 'TRENDING · THIS WEEK', fontSize: 9, color: '#e07a3f', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
+          { id: 'pv-ec-num', type: 'headingNumber', x: 0.08, y: 0.24, number: '5', fontSize: 110, color: '#e07a3f', font: 'var(--font-playfair), Georgia, serif', italic: true, snap: 'free' },
+          { id: 'pv-ec-head', type: 'headingText', x: 0.32, y: 0.3, text: 'Things that happened this week', fontSize: 24, color: '#111111', font: 'var(--font-playfair), Georgia, serif', lineHeight: 1.05, bold: false, width: 0.6, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-ec-sub', type: 'bodyText', x: 0.08, y: 0.78, text: 'and which ones actually matter', fontSize: 13, color: '#4a4a4a', font: 'var(--font-playfair), Georgia, serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
         ],
       };
 
@@ -241,22 +213,14 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
       return {
         ...base,
         paperBg: 'cream',
-        header: {
-          enabled: true,
-          handle: '@yourhandle',
-          showCounter: true,
-          showProgress: true,
-          accentColor: '#e07a3f',
-          textColor: '#1a1a1a',
-        },
+        header: { enabled: true, handle: '@yourhandle', showCounter: true, showProgress: true, accentColor: '#e07a3f', textColor: '#1a1a1a' },
         elements: [
-          { id: 'pv-eo-head', type: 'headingText', x: 0.1, y: 0.3, text: 'That’s a wrap.', fontSize: 40, color: '#111111', font: 'Georgia, serif', lineHeight: 1.05, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
-          { id: 'pv-eo-body', type: 'bodyText', x: 0.1, y: 0.52, text: 'Save this post for later and follow for more.', fontSize: 13, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.8, align: 'left', snap: 'free' },
+          { id: 'pv-eo-head', type: 'headingText', x: 0.1, y: 0.3, text: 'That’s a wrap.', fontSize: 40, color: '#111111', font: 'var(--font-playfair), Georgia, serif', lineHeight: 1.05, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-eo-body', type: 'bodyText', x: 0.1, y: 0.52, text: 'Save this post for later and follow for more.', fontSize: 13, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.8, align: 'left', snap: 'free' },
           { id: 'pv-eo-pill', type: 'logoPill', x: 0, y: 0, text: '★ SAVE FOR LATER', bgColor: '#e07a3f', textColor: '#ffffff', fontSize: 11, snap: 'bottom-center' },
         ],
       };
 
-    // ---------------- SPLIT QUOTE ----------------
     case 'splitQuote':
       return {
         ...base,
@@ -264,9 +228,9 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         overlayOpacity: 1,
         elements: [
           { id: 'pv-sq-split', type: 'splitImage', x: 0, y: 0, width: 1, height: 0.62, leftImageUrl: PHOTO_2, rightImageUrl: PHOTO_1, splitRatio: 0.5, divider: 'none', dividerColor: '#ffffff', snap: 'free' },
-          { id: 'pv-sq-qm', type: 'quoteMark', x: 0.055, y: 0.48, char: '“', fontSize: 80, color: '#ffffff', font: 'Georgia, serif', snap: 'free' },
-          { id: 'pv-sq-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST IDEAS COME FROM PEOPLE WHO SHIP EVERY DAY.', fontSize: 22, color: '#ffffff', font: 'Inter, system-ui, sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
-          { id: 'pv-sq-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, EVENT (YEAR)', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
+          { id: 'pv-sq-qm', type: 'quoteMark', x: 0.055, y: 0.48, char: '“', fontSize: 80, color: '#ffffff', font: 'var(--font-playfair), Georgia, serif', snap: 'free' },
+          { id: 'pv-sq-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST IDEAS COME FROM PEOPLE WHO SHIP EVERY DAY.', fontSize: 22, color: '#ffffff', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-sq-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, EVENT (YEAR)', fontSize: 10, color: '#ffffff', font: 'var(--font-outfit), Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
         ],
       };
 
@@ -277,8 +241,8 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         overlayOpacity: 1,
         elements: [
           { id: 'pv-sqd-split', type: 'splitImage', x: 0, y: 0, width: 1, height: 0.58, leftImageUrl: PHOTO_2, rightImageUrl: PHOTO_3, splitRatio: 0.5, divider: 'gap', dividerColor: '#ffffff', snap: 'free' },
-          { id: 'pv-sqd-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST STORIES START WITH A SINGLE LINE.', fontSize: 24, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.1, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
-          { id: 'pv-sqd-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, SOURCE (YEAR)', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
+          { id: 'pv-sqd-head', type: 'headingText', x: 0.055, y: 0.62, text: 'THE BEST STORIES START WITH A SINGLE LINE.', fontSize: 24, color: '#ffffff', font: 'var(--font-archivo-black), "Arial Black", sans-serif', lineHeight: 1.1, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-sqd-attr', type: 'attribution', x: 0.055, y: 0.9, text: '-YOUR NAME, SOURCE (YEAR)', fontSize: 10, color: '#ffffff', font: 'var(--font-outfit), Inter, system-ui, sans-serif', letterSpacing: 0.5, uppercase: false, bold: true, width: 0.89, align: 'left', snap: 'free' },
         ],
       };
 
@@ -291,8 +255,54 @@ export function getPreviewConfig(templateId: string, current: PostConfig): PostC
         align: 'left',
         elements: [
           { id: 'pv-mem-circle', type: 'circleImage', x: 0.06, y: 0.3, size: 0.3, imageUrl: PHOTO_3, snap: 'free' },
-          { id: 'pv-mem-head', type: 'headingText', x: 0.055, y: 0.62, text: 'HAPPY BIRTHDAY TO SOMEONE GREAT — WE MISS YOU EVERY DAY', fontSize: 20, color: '#ffffff', font: 'Impact, "Arial Black", sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
-          { id: 'pv-mem-attr', type: 'attribution', x: 0.055, y: 0.93, text: 'SWIPE FOR MORE', fontSize: 10, color: '#ffffff', font: 'Inter, system-ui, sans-serif', letterSpacing: 1.5, uppercase: true, bold: true, width: 0.89, align: 'center', snap: 'free' },
+          { id: 'pv-mem-head', type: 'headingText', x: 0.055, y: 0.62, text: 'HAPPY BIRTHDAY TO SOMEONE GREAT', fontSize: 20, color: '#ffffff', font: 'var(--font-bebas), Impact, "Arial Narrow", sans-serif', lineHeight: 1.12, bold: true, width: 0.89, align: 'left', shadow: true, snap: 'free' },
+          { id: 'pv-mem-attr', type: 'attribution', x: 0.055, y: 0.93, text: 'SWIPE FOR MORE', fontSize: 10, color: '#ffffff', font: 'var(--font-outfit), Inter, system-ui, sans-serif', letterSpacing: 1.5, uppercase: true, bold: true, width: 0.89, align: 'center', snap: 'free' },
+        ],
+      };
+
+    // ---------- BASQUIAT PREVIEWS ----------
+
+    case 'basquiatYellow':
+      return {
+        ...base,
+        paperBg: 'cream',
+        elements: [
+          { id: 'pv-by-crown', type: 'crown', x: 0.05, y: 0.06, size: 0.22, color: '#fbbf24', strokeColor: '#111111', strokeWidth: 4, style: 'solid', snap: 'free' },
+          { id: 'pv-by-tag', type: 'tag', x: 0.68, y: 0.08, text: '© 2026', fontSize: 14, color: '#111111', font: 'var(--font-rock-salt), cursive', rotation: -3, snap: 'free' },
+          { id: 'pv-by-h1', type: 'headingText', x: 0.06, y: 0.32, text: 'MAKE IT LOUD.', fontSize: 44, color: '#111111', font: 'var(--font-permanent-marker), "Comic Sans MS", cursive', lineHeight: 1.05, bold: false, width: 0.88, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-by-x', type: 'crossout', x: 0.15, y: 0.42, width: 0.55, height: 5, color: '#dc2626', rotation: -2, snap: 'free' },
+          { id: 'pv-by-h2', type: 'headingText', x: 0.06, y: 0.48, text: 'THEN LOUDER.', fontSize: 36, color: '#111111', font: 'var(--font-permanent-marker), "Comic Sans MS", cursive', lineHeight: 1.05, bold: false, width: 0.88, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-by-body', type: 'bodyText', x: 0.06, y: 0.68, text: 'Not for sale. Not for critics.', fontSize: 14, color: '#1a1a1a', font: 'var(--font-caveat-brush), cursive', lineHeight: 1.3, width: 0.88, align: 'left', snap: 'free' },
+          { id: 'pv-by-price', type: 'tag', x: 0.06, y: 0.9, text: '5¢', fontSize: 16, color: '#dc2626', font: 'var(--font-rock-salt), cursive', rotation: 2, snap: 'free' },
+        ],
+      };
+
+    case 'basquiatRed':
+      return {
+        ...base,
+        paperBg: 'cream',
+        elements: [
+          { id: 'pv-br-crown', type: 'crown', x: 0.55, y: 0.06, size: 0.28, color: 'transparent', strokeColor: '#dc2626', strokeWidth: 5, style: 'outline', snap: 'free' },
+          { id: 'pv-br-listen', type: 'tag', x: 0.06, y: 0.08, text: 'listen,', fontSize: 18, color: '#111111', font: 'var(--font-rock-salt), cursive', rotation: -4, snap: 'free' },
+          { id: 'pv-br-h1', type: 'headingText', x: 0.06, y: 0.22, text: 'BE NICE', fontSize: 40, color: '#111111', font: 'var(--font-rock-salt), cursive', lineHeight: 1.05, bold: false, width: 0.88, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-br-x', type: 'crossout', x: 0.06, y: 0.28, width: 0.4, height: 6, color: '#dc2626', rotation: -3, snap: 'free' },
+          { id: 'pv-br-h2', type: 'headingText', x: 0.06, y: 0.4, text: 'MAKE NOISE.', fontSize: 48, color: '#dc2626', font: 'var(--font-permanent-marker), "Comic Sans MS", cursive', lineHeight: 1.02, bold: false, width: 0.88, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-br-body', type: 'bodyText', x: 0.06, y: 0.62, text: 'Nobody remembers the quiet ones.', fontSize: 15, color: '#1a1a1a', font: 'var(--font-caveat-brush), cursive', lineHeight: 1.3, width: 0.88, align: 'left', snap: 'free' },
+          { id: 'pv-br-tag', type: 'tag', x: 0.06, y: 0.9, text: '© 2026 · NOT FOR SALE', fontSize: 11, color: '#111111', font: 'var(--font-rock-salt), cursive', rotation: -1, snap: 'free' },
+        ],
+      };
+
+    case 'basquiatBlue':
+      return {
+        ...base,
+        paperBg: 'cream',
+        elements: [
+          { id: 'pv-bb-crown', type: 'crown', x: 0.06, y: 0.08, size: 0.18, color: '#1d4ed8', strokeColor: '#111111', strokeWidth: 3, style: 'solid', snap: 'free' },
+          { id: 'pv-bb-tag', type: 'tag', x: 0.7, y: 0.1, text: '03.20.26', fontSize: 12, color: '#1d4ed8', font: 'var(--font-rock-salt), cursive', rotation: 2, snap: 'free' },
+          { id: 'pv-bb-qm', type: 'quoteMark', x: 0.06, y: 0.24, char: '“', fontSize: 90, color: '#1d4ed8', font: 'var(--font-playfair), Georgia, serif', snap: 'free' },
+          { id: 'pv-bb-head', type: 'headingText', x: 0.06, y: 0.42, text: 'I DON’T LISTEN TO WHAT ART CRITICS SAY.', fontSize: 26, color: '#111111', font: 'var(--font-caveat-brush), cursive', lineHeight: 1.15, bold: false, width: 0.88, align: 'left', shadow: false, snap: 'free' },
+          { id: 'pv-bb-attr', type: 'attribution', x: 0.06, y: 0.72, text: '— just look at what I see.', fontSize: 15, color: '#1d4ed8', font: 'var(--font-caveat-brush), cursive', letterSpacing: 0.5, uppercase: false, bold: false, width: 0.88, align: 'left', snap: 'free' },
+          { id: 'pv-bb-outline', type: 'crown', x: 0.5, y: 0.88, size: 0.08, color: 'transparent', strokeColor: '#1d4ed8', strokeWidth: 3, style: 'outline', snap: 'free' },
         ],
       };
 

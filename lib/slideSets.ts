@@ -1,6 +1,6 @@
 // lib/slideSets.ts
 import type { PostConfig, SlideTheme } from './types';
-import { DEFAULT_CONFIG, extractTheme, applyTheme } from './types';
+import { DEFAULT_CONFIG, extractTheme, applyTheme, DEFAULT_MOTION } from './types';
 
 export type SlideSetId = 'editorial' | 'boldNews' | 'minimal' | 'magazine';
 
@@ -38,6 +38,7 @@ const editorialTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
+  motion: { ...DEFAULT_MOTION },
 };
 
 function editorialCover(): PostConfig {
@@ -106,6 +107,7 @@ const boldNewsTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 6, offsetX: 0, offsetY: 2 },
   letterSpacing: 0,
   uppercase: true,
+  motion: { ...DEFAULT_MOTION },
 };
 
 function boldNewsCover(): PostConfig {
@@ -166,6 +168,7 @@ const minimalTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
+  motion: { ...DEFAULT_MOTION },
 };
 
 function minimalCover(): PostConfig {
@@ -230,6 +233,7 @@ const magazineTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
+  motion: { ...DEFAULT_MOTION },
 };
 
 function magazineCover(): PostConfig {

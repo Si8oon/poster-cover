@@ -11,6 +11,7 @@ import {
   normalizeConfig,
   extractTheme,
   applyTheme,
+  DEFAULT_MOTION,
   type PostConfig,
   type CanvasElement,
   type CardElement,
@@ -20,6 +21,9 @@ import {
 } from '@/lib/types';
 import { TEMPLATES, getTemplate, type TemplateId } from '@/lib/templates';
 import { ALL_FONTS, fontEntryToFamily, findFontEntry, warmupFonts } from '@/lib/fonts';
+import { useHistory } from '@/lib/useHistory';
+import { getTheme as getAppTheme } from '@/lib/themes';
+import type { ThemeId } from '@/lib/themes';
 import TemplatePreview from '../TemplatePreview';
 
 const PostCanvas = dynamic(() => import('./PostCanvas'), {
@@ -45,12 +49,19 @@ type Props = {
   initialTheme?: SlideTheme;
 };
 
+type EditorSnapshot = {
+  slides: PostConfig[];
+  theme: SlideTheme;
+};
+
 const COLORS = [
   '#ffffff', '#000000', '#00d97e', '#fbbf24', '#ef4444',
   '#8b5cf6', '#22d3ee', '#ec4899', '#22c55e', '#f97316',
   '#0ea5e9', '#a855f7', '#14b8a6', '#f43f5e', '#eab308',
   '#e07a3f', '#faf7f0', '#1a1a1a', '#4a4a4a', '#666666',
 ];
+
+const THEME_KEY = 'postgen:theme';
 
 export default function EditorScreen({
   onClose, onSaved, initialTemplate, editingPostId, initialSlides, initialTheme,
@@ -64,44 +75,79 @@ export default function EditorScreen({
 
   const isEditing = !!editingPostId;
 
-  // Warm up font resolution once
   useEffect(() => {
     warmupFonts();
   }, []);
 
-  const [slides, setSlides] = useState<PostConfig[]>(() => {
-    if (initialSlides && initialSlides.length > 0)
-      return initialSlides.map((s) => normalizeConfig(s));
-    const base = { ...DEFAULT_CONFIG };
-    if (initialTemplate) {
-      const t = getTemplate(initialTemplate);
-      if (t) {
-        Object.assign(base, t.config);
-        if (t.elements) base.elements = t.elements;
+  const initialSnapshot: EditorSnapshot = (() => {
+    // Read the currently-active app theme's default motion (for new posts only)
+    let appThemeMotion = { ...DEFAULT_MOTION };
+    if (!isEditing && typeof window !== 'undefined') {
+      const savedThemeId = (localStorage.getItem(THEME_KEY) as ThemeId | null) ?? 'white';
+      const appTheme = getAppTheme(savedThemeId);
+      if (appTheme) {
+        appThemeMotion = { ...appTheme.defaultMotion };
       }
     }
-    return [base];
-  });
 
-  const [theme, setTheme] = useState<SlideTheme>(() => {
-    if (initialTheme) return initialTheme;
-    if (initialSlides && initialSlides.length > 0) {
-      return extractTheme(normalizeConfig(initialSlides[0]));
-    }
-    const base = { ...DEFAULT_CONFIG };
-    if (initialTemplate) {
-      const t = getTemplate(initialTemplate);
-      if (t) {
-        Object.assign(base, t.config);
-        if (t.elements) base.elements = t.elements;
+    const computeSlides = (): PostConfig[] => {
+      if (initialSlides && initialSlides.length > 0)
+        return initialSlides.map((s) => normalizeConfig(s));
+      const base = { ...DEFAULT_CONFIG };
+      if (initialTemplate) {
+        const t = getTemplate(initialTemplate);
+        if (t) {
+          Object.assign(base, t.config);
+          if (t.elements) base.elements = t.elements;
+        }
       }
-    }
-    return extractTheme(base);
-  });
+      // Apply the app theme's motion to the new slide
+      base.motion = appThemeMotion;
+      return [base];
+    };
+
+    const slides = computeSlides();
+
+    const theme: SlideTheme = (() => {
+      if (initialTheme) return initialTheme;
+      if (slides.length > 0) {
+        const extracted = extractTheme(slides[0]);
+        return extracted;
+      }
+      const base = { ...DEFAULT_CONFIG };
+      if (initialTemplate) {
+        const t = getTemplate(initialTemplate);
+        if (t) {
+          Object.assign(base, t.config);
+          if (t.elements) base.elements = t.elements;
+        }
+      }
+      base.motion = appThemeMotion;
+      return extractTheme(base);
+    })();
+
+    return { slides, theme };
+  })();
+
+  const history = useHistory<EditorSnapshot>(initialSnapshot);
+  const { slides, theme } = history.value;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentSlide = slides[currentIndex];
   const isCurrentLinked = currentSlide.linkedTheme !== false;
+
+  const setSlides = (
+    updater: PostConfig[] | ((prev: PostConfig[]) => PostConfig[]),
+    opts?: { immediate?: boolean }
+  ) => {
+    history.set(
+      (prev) => ({
+        ...prev,
+        slides: typeof updater === 'function' ? updater(prev.slides) : updater,
+      }),
+      opts
+    );
+  };
 
   const updateCurrentSlide = (patch: Partial<PostConfig>) => {
     setSlides((prev) =>
@@ -110,10 +156,15 @@ export default function EditorScreen({
   };
 
   const updateTheme = (patch: Partial<SlideTheme>) => {
-    const next: SlideTheme = { ...theme, ...patch };
-    setTheme(next);
-    setSlides((prev) =>
-      prev.map((s) => (s.linkedTheme === false ? s : applyTheme(s, next)))
+    const next = { ...theme, ...patch };
+    history.set(
+      (prev) => ({
+        theme: next,
+        slides: prev.slides.map((s) =>
+          s.linkedTheme === false ? s : applyTheme(s, next)
+        ),
+      }),
+      { immediate: true }
     );
   };
 
@@ -136,7 +187,7 @@ export default function EditorScreen({
 
   const addSlide = () => {
     const fresh = applyTheme(createEmptySlide(), theme);
-    setSlides((prev) => [...prev, fresh]);
+    setSlides((prev) => [...prev, fresh], { immediate: true });
     setCurrentIndex(slides.length);
   };
   const duplicateSlide = () => {
@@ -149,34 +200,62 @@ export default function EditorScreen({
       const next = [...prev];
       next.splice(currentIndex + 1, 0, copy);
       return next;
-    });
+    }, { immediate: true });
     setCurrentIndex((i) => i + 1);
   };
   const deleteSlide = () => {
     if (slides.length === 1) {
-      setSlides([applyTheme(createEmptySlide(), theme)]);
+      setSlides([applyTheme(createEmptySlide(), theme)], { immediate: true });
       setCurrentIndex(0);
       return;
     }
     const next = slides.filter((_, i) => i !== currentIndex);
-    setSlides(next);
+    setSlides(next, { immediate: true });
     setCurrentIndex(Math.min(currentIndex, next.length - 1));
   };
   const goPrev = () => setCurrentIndex((i) => Math.max(0, i - 1));
   const goNext = () => setCurrentIndex((i) => Math.min(slides.length - 1, i + 1));
 
   useEffect(() => {
+    const isMac =
+      typeof navigator !== 'undefined' &&
+      /Mac|iPhone|iPad/.test(navigator.platform);
+    const modKey = isMac ? 'metaKey' : 'ctrlKey';
+
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const isEditingField =
+        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if ((e as KeyboardEvent & Record<string, boolean>)[modKey] && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          history.redo();
+        } else {
+          if (isEditingField) return;
+          e.preventDefault();
+          history.undo();
+        }
+        return;
+      }
+
+      if ((e as KeyboardEvent & Record<string, boolean>)[modKey] && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        history.redo();
+        return;
+      }
+
+      if (isEditingField) return;
+
       if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
       else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
     };
+
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slides.length]);
+  }, [slides.length, history.canUndo, history.canRedo]);
 
   const [bgFile, setBgFile] = useState<File | null>(null);
   const openBgPicker = () => { bgInputRef.current?.click(); };
@@ -205,8 +284,8 @@ export default function EditorScreen({
     if (!t) return;
     setActiveTemplate(id);
 
-    setSlides((prev) =>
-      prev.map((s, i) => {
+    history.set((prev) => {
+      const nextSlides = prev.slides.map((s, i) => {
         if (i !== currentIndex) return s;
         const merged: PostConfig = {
           ...s,
@@ -214,27 +293,28 @@ export default function EditorScreen({
           elements: t.elements ? t.elements : s.elements,
         };
         return merged;
-      })
-    );
+      });
 
-    if (isCurrentLinked) {
-      const t2 = getTemplate(id);
-      if (t2) {
-        const merged = { ...currentSlide, ...t2.config };
-        if (t2.elements) merged.elements = t2.elements;
+      const isLinked = prev.slides[currentIndex]?.linkedTheme !== false;
+      if (isLinked) {
+        const merged = { ...prev.slides[currentIndex], ...t.config };
+        if (t.elements) merged.elements = t.elements;
         const newTheme = extractTheme(merged as PostConfig);
-        setTheme(newTheme);
-        setSlides((prev) =>
-          prev.map((s, i) =>
-            i === currentIndex || s.linkedTheme === false
-              ? i === currentIndex
-                ? ({ ...merged, linkedTheme: true } as PostConfig)
-                : s
+
+        return {
+          theme: newTheme,
+          slides: nextSlides.map((s, i) =>
+            i === currentIndex
+              ? ({ ...merged, linkedTheme: true } as PostConfig)
+              : s.linkedTheme === false
+              ? s
               : applyTheme(s, newTheme)
-          )
-        );
+          ),
+        };
       }
-    }
+
+      return { ...prev, slides: nextSlides };
+    }, { immediate: true });
   };
 
   const addElement = (type: CanvasElement['type']) => {
@@ -281,6 +361,38 @@ export default function EditorScreen({
         bold: true,
         width: 0.85,
         align: 'left',
+        snap: 'free',
+      };
+    } else if (type === 'crossout') {
+      el = {
+        id, type: 'crossout',
+        x: 0.15, y: 0.3,
+        width: 0.5,
+        height: 4,
+        color: '#dc2626',
+        rotation: -2,
+        snap: 'free',
+      };
+    } else if (type === 'crown') {
+      el = {
+        id, type: 'crown',
+        x: 0.35, y: 0.1,
+        size: 0.25,
+        color: '#fbbf24',
+        strokeColor: '#000000',
+        strokeWidth: 3,
+        style: 'solid',
+        snap: 'free',
+      };
+    } else if (type === 'tag') {
+      el = {
+        id, type: 'tag',
+        x: 0.06, y: 0.9,
+        text: '© 2026',
+        fontSize: 14,
+        color: '#111111',
+        font: 'var(--font-permanent-marker), cursive',
+        rotation: -3,
         snap: 'free',
       };
     } else {
@@ -446,9 +558,32 @@ export default function EditorScreen({
 
       <header className="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}>
-        <button onClick={onClose} className="px-3 py-2 rounded-xl text-sm font-medium"
-          style={{ color: 'var(--text-muted)' }}>✕ Cancel</button>
+        <div className="flex items-center gap-1">
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-sm font-medium"
+            style={{ color: 'var(--text-muted)' }}>✕</button>
+          <div className="w-px h-5 mx-1" style={{ background: 'var(--border)' }} />
+          <button
+            onClick={history.undo}
+            disabled={!history.canUndo}
+            title="Undo (Ctrl+Z)"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          >
+            ↶
+          </button>
+          <button
+            onClick={history.redo}
+            disabled={!history.canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          >
+            ↷
+          </button>
+        </div>
+
         <p className="text-sm font-semibold">{isEditing ? 'Edit Post' : 'New Post'}</p>
+
         <button onClick={handleSave} disabled={saving}
           className="px-4 py-2 rounded-xl text-sm font-semibold active:scale-95 disabled:opacity-50 transition"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>
@@ -456,7 +591,6 @@ export default function EditorScreen({
         </button>
       </header>
 
-      {/* Slide navigator */}
       <div className="px-4 py-3 flex items-center justify-between gap-3 shrink-0 overflow-x-auto no-scrollbar"
         style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-2 shrink-0">
@@ -592,7 +726,7 @@ export default function EditorScreen({
             )}
 
             <p className="text-[10px] hidden lg:block" style={{ color: 'var(--text-muted)' }}>
-              Tip: use ← → to switch slides, Esc to close
+              Tip: ← → switch slides · Ctrl+Z undo · Esc close
             </p>
           </div>
 
@@ -609,7 +743,6 @@ export default function EditorScreen({
               ))}
             </div>
 
-            {/* THEME TAB */}
             {tab === 'theme' && (
               <div className="flex flex-col gap-5">
                 <div className="rounded-2xl p-3 text-xs"
@@ -617,7 +750,6 @@ export default function EditorScreen({
                   🔗 Changes here apply to all <strong>linked</strong> slides.
                 </div>
 
-                {/* Font picker with in-font preview */}
                 <div className="flex flex-col gap-2">
                   <Label>Font (all slides)</Label>
                   <FontPicker
@@ -707,10 +839,65 @@ export default function EditorScreen({
                     onChange={(e) => updateTheme({ overlayOpacity: Number(e.target.value) / 100 })}
                     className="w-full" />
                 </div>
+
+                <div className="flex flex-col gap-3 p-3 rounded-2xl"
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--text-muted)' }}>🎬 Motion</p>
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                      Bring decorative elements to life
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['none', 'breathing', 'floating'] as const).map((m) => (
+                      <button key={m}
+                        onClick={() => updateTheme({ motion: { ...theme.motion, type: m } })}
+                        className="py-2 rounded-xl text-[10px] font-semibold capitalize"
+                        style={{
+                          background: theme.motion.type === m ? 'var(--accent)' : 'var(--bg)',
+                          color: theme.motion.type === m ? 'var(--accent-fg)' : 'var(--text-muted)',
+                          border: '1px solid var(--border)',
+                        }}>
+                        {m === 'none' ? 'Off' : m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {theme.motion.type !== 'none' && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                          <span>Speed</span>
+                          <span>{theme.motion.speed.toFixed(1)}×</span>
+                        </span>
+                        <input type="range" min={0.5} max={2} step={0.1}
+                          value={theme.motion.speed}
+                          onChange={(e) => updateTheme({
+                            motion: { ...theme.motion, speed: Number(e.target.value) }
+                          })}
+                          className="w-full" />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                          <span>Intensity</span>
+                          <span>{theme.motion.intensity.toFixed(1)}×</span>
+                        </span>
+                        <input type="range" min={0.5} max={1.5} step={0.1}
+                          value={theme.motion.intensity}
+                          onChange={(e) => updateTheme({
+                            motion: { ...theme.motion, intensity: Number(e.target.value) }
+                          })}
+                          className="w-full" />
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* TEMPLATE TAB */}
             {tab === 'template' && (
               <div className="grid grid-cols-1 gap-3">
                 {TEMPLATES.map((t) => {
@@ -743,7 +930,6 @@ export default function EditorScreen({
               </div>
             )}
 
-            {/* TEXT TAB */}
             {tab === 'text' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
@@ -764,7 +950,6 @@ export default function EditorScreen({
               </div>
             )}
 
-            {/* FX TAB */}
             {tab === 'fx' && (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
@@ -832,7 +1017,6 @@ export default function EditorScreen({
               </div>
             )}
 
-            {/* STYLE TAB */}
             {tab === 'style' && (
               <div className="flex flex-col gap-4">
                 <div className="rounded-2xl p-3 text-xs"
@@ -862,7 +1046,6 @@ export default function EditorScreen({
               </div>
             )}
 
-            {/* ELEMENTS TAB */}
             {tab === 'elements' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
@@ -888,6 +1071,14 @@ export default function EditorScreen({
                     <AddButton onClick={() => addElement('splitImage')} emoji="🖼️" label="Split Image" />
                     <AddButton onClick={() => addElement('quoteMark')} emoji="❝" label="Quote Mark" />
                     <AddButton onClick={() => addElement('attribution')} emoji="🖋️" label="Attribution" />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>🎨 Basquiat kit</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <AddButton onClick={() => addElement('crown')} emoji="👑" label="Crown" />
+                    <AddButton onClick={() => addElement('crossout')} emoji="✏️" label="Cross-out" />
+                    <AddButton onClick={() => addElement('tag')} emoji="🏷️" label="Tag" />
                   </div>
                 </div>
                 {currentSlide.elements.length === 0 ? (
@@ -931,7 +1122,6 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Font picker with each font rendered in its own font */
 function FontPicker({
   value,
   onChange,
@@ -940,8 +1130,6 @@ function FontPicker({
   onChange: (family: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-
-  // Resolve current font name for the label
   const currentEntry = findFontEntry(value);
   const currentLabel = currentEntry?.name ?? 'Custom';
 
@@ -959,10 +1147,7 @@ function FontPicker({
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl overflow-hidden shadow-xl fade-in"
             style={{
@@ -976,7 +1161,7 @@ function FontPicker({
               className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider sticky top-0"
               style={{ background: 'var(--card)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
             >
-              Google Fonts
+              Fonts
             </div>
             {ALL_FONTS.map((f) => {
               const family = fontEntryToFamily(f);
@@ -1105,6 +1290,9 @@ function ElementControls({
     splitImage: '🖼️ Split image',
     quoteMark: '❝ Quote mark',
     attribution: '🖋️ Attribution',
+    crossout: '✏️ Cross-out',
+    crown: '👑 Crown',
+    tag: '🏷️ Tag',
   };
 
   return (
@@ -1212,9 +1400,6 @@ function ElementControls({
           <RangeRow label="Size" min={16} max={60} value={element.fontSize}
             display={`${element.fontSize}px`}
             onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
-            display={`${Math.round(element.width * 100)}%`}
-            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
           <MiniColorRow label="Color" colors={['#111111', '#ffffff', '#e07a3f', '#fbbf24', '#22c55e', '#ef4444']}
             value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
           <button onClick={() => onChange({ shadow: !element.shadow } as Partial<CanvasElement>)}
@@ -1245,6 +1430,79 @@ function ElementControls({
 
       {element.type === 'card' && (
         <CardControls element={element} onChange={onChange} />
+      )}
+
+      {element.type === 'crossout' && (
+        <>
+          <RangeRow label="Width" min={10} max={100} value={element.width * 100}
+            display={`${Math.round(element.width * 100)}%`}
+            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
+          <RangeRow label="Thickness" min={2} max={14} value={element.height}
+            display={`${element.height}px`}
+            onChange={(v) => onChange({ height: v } as Partial<CanvasElement>)} />
+          <RangeRow label="Rotation" min={-15} max={15} value={element.rotation}
+            display={`${element.rotation}°`}
+            onChange={(v) => onChange({ rotation: v } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color"
+            colors={['#dc2626', '#111111', '#fbbf24', '#1d4ed8', '#16a34a']}
+            value={element.color}
+            onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'crown' && (
+        <>
+          <RangeRow label="Size" min={5} max={60} value={element.size * 100}
+            display={`${Math.round(element.size * 100)}%`}
+            onChange={(v) => onChange({ size: v / 100 } as Partial<CanvasElement>)} />
+          <RangeRow label="Stroke" min={0} max={10} value={element.strokeWidth}
+            display={`${element.strokeWidth}px`}
+            onChange={(v) => onChange({ strokeWidth: v } as Partial<CanvasElement>)} />
+          <div className="flex gap-2">
+            <button onClick={() => onChange({ style: 'solid' } as Partial<CanvasElement>)}
+              className="flex-1 py-2 rounded-xl text-[10px] font-semibold"
+              style={{
+                background: element.style === 'solid' ? 'var(--accent)' : 'var(--bg)',
+                color: element.style === 'solid' ? 'var(--accent-fg)' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+              }}>Solid</button>
+            <button onClick={() => onChange({ style: 'outline' } as Partial<CanvasElement>)}
+              className="flex-1 py-2 rounded-xl text-[10px] font-semibold"
+              style={{
+                background: element.style === 'outline' ? 'var(--accent)' : 'var(--bg)',
+                color: element.style === 'outline' ? 'var(--accent-fg)' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+              }}>Outline</button>
+          </div>
+          <MiniColorRow label="Fill"
+            colors={['#fbbf24', '#dc2626', '#1d4ed8', '#16a34a', '#111111', '#ffffff']}
+            value={element.color}
+            onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Stroke"
+            colors={['#000000', '#ffffff', '#dc2626', '#1d4ed8']}
+            value={element.strokeColor}
+            onChange={(c) => onChange({ strokeColor: c } as Partial<CanvasElement>)} />
+        </>
+      )}
+
+      {element.type === 'tag' && (
+        <>
+          <input value={element.text}
+            onChange={(e) => onChange({ text: e.target.value } as Partial<CanvasElement>)}
+            placeholder="© 2026"
+            className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <RangeRow label="Size" min={8} max={32} value={element.fontSize}
+            display={`${element.fontSize}px`}
+            onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
+          <RangeRow label="Rotation" min={-15} max={15} value={element.rotation}
+            display={`${element.rotation}°`}
+            onChange={(v) => onChange({ rotation: v } as Partial<CanvasElement>)} />
+          <MiniColorRow label="Color"
+            colors={['#111111', '#dc2626', '#1d4ed8', '#16a34a', '#fbbf24']}
+            value={element.color}
+            onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
+        </>
       )}
     </div>
   );
@@ -1280,9 +1538,6 @@ function SplitImageControls({
       <RangeRow label="Split ratio" min={20} max={80} value={element.splitRatio * 100}
         display={`${Math.round(element.splitRatio * 100)} / ${Math.round(100 - element.splitRatio * 100)}`}
         onChange={(v) => onChange({ splitRatio: v / 100 } as Partial<CanvasElement>)} />
-      <RangeRow label="Width" min={40} max={100} value={element.width * 100}
-        display={`${Math.round(element.width * 100)}%`}
-        onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
       <RangeRow label="Height" min={20} max={100} value={element.height * 100}
         display={`${Math.round(element.height * 100)}%`}
         onChange={(v) => onChange({ height: v / 100 } as Partial<CanvasElement>)} />

@@ -10,7 +10,10 @@ export type ElementType =
   | 'card'
   | 'splitImage'
   | 'quoteMark'
-  | 'attribution';
+  | 'attribution'
+  | 'crossout'
+  | 'crown'
+  | 'tag';
 
 export type SnapPosition =
   | 'top-left' | 'top-center' | 'top-right'
@@ -18,11 +21,27 @@ export type SnapPosition =
   | 'bottom-left' | 'bottom-center' | 'bottom-right'
   | 'free';
 
+// ---------- Motion ----------
+export type MotionType = 'none' | 'breathing' | 'floating';
+
+export type MotionConfig = {
+  type: MotionType;
+  speed: number;
+  intensity: number;
+};
+
+export const DEFAULT_MOTION: MotionConfig = {
+  type: 'none',
+  speed: 1,
+  intensity: 1,
+};
+
+// ---------- Elements ----------
+
 export type CircleImageElement = {
   id: string;
   type: 'circleImage';
-  x: number;
-  y: number;
+  x: number; y: number;
   size: number;
   imageUrl: string;
   snap: SnapPosition;
@@ -31,8 +50,7 @@ export type CircleImageElement = {
 export type LogoPillElement = {
   id: string;
   type: 'logoPill';
-  x: number;
-  y: number;
+  x: number; y: number;
   text: string;
   bgColor: string;
   textColor: string;
@@ -43,8 +61,7 @@ export type LogoPillElement = {
 export type SwipeArrowElement = {
   id: string;
   type: 'swipeArrow';
-  x: number;
-  y: number;
+  x: number; y: number;
   size: number;
   bgColor: string;
   textColor: string;
@@ -54,8 +71,7 @@ export type SwipeArrowElement = {
 export type HeadingNumberElement = {
   id: string;
   type: 'headingNumber';
-  x: number;
-  y: number;
+  x: number; y: number;
   number: string;
   fontSize: number;
   color: string;
@@ -67,8 +83,7 @@ export type HeadingNumberElement = {
 export type HeadingTextElement = {
   id: string;
   type: 'headingText';
-  x: number;
-  y: number;
+  x: number; y: number;
   text: string;
   fontSize: number;
   color: string;
@@ -84,8 +99,7 @@ export type HeadingTextElement = {
 export type BodyTextElement = {
   id: string;
   type: 'bodyText';
-  x: number;
-  y: number;
+  x: number; y: number;
   text: string;
   fontSize: number;
   color: string;
@@ -96,17 +110,12 @@ export type BodyTextElement = {
   snap: SnapPosition;
 };
 
-export type CardStat = {
-  icon: string;
-  value: string;
-  label: string;
-};
+export type CardStat = { icon: string; value: string; label: string };
 
 export type CardElement = {
   id: string;
   type: 'card';
-  x: number;
-  y: number;
+  x: number; y: number;
   width: number;
   title: string;
   subtitle: string;
@@ -122,8 +131,7 @@ export type CardElement = {
 export type SplitImageElement = {
   id: string;
   type: 'splitImage';
-  x: number;
-  y: number;
+  x: number; y: number;
   width: number;
   height: number;
   leftImageUrl: string;
@@ -137,8 +145,7 @@ export type SplitImageElement = {
 export type QuoteMarkElement = {
   id: string;
   type: 'quoteMark';
-  x: number;
-  y: number;
+  x: number; y: number;
   char: string;
   fontSize: number;
   color: string;
@@ -149,8 +156,7 @@ export type QuoteMarkElement = {
 export type AttributionElement = {
   id: string;
   type: 'attribution';
-  x: number;
-  y: number;
+  x: number; y: number;
   text: string;
   fontSize: number;
   color: string;
@@ -160,6 +166,44 @@ export type AttributionElement = {
   bold?: boolean;
   width: number;
   align?: 'left' | 'center' | 'right';
+  snap: SnapPosition;
+};
+
+export type CrossoutElement = {
+  id: string;
+  type: 'crossout';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  rotation: number;
+  snap: SnapPosition;
+};
+
+export type CrownElement = {
+  id: string;
+  type: 'crown';
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  strokeColor: string;
+  strokeWidth: number;
+  style: 'solid' | 'outline';
+  snap: SnapPosition;
+};
+
+export type TagElement = {
+  id: string;
+  type: 'tag';
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  color: string;
+  font: string;
+  rotation: number;
   snap: SnapPosition;
 };
 
@@ -173,29 +217,20 @@ export type CanvasElement =
   | CardElement
   | SplitImageElement
   | QuoteMarkElement
-  | AttributionElement;
+  | AttributionElement
+  | CrossoutElement
+  | CrownElement
+  | TagElement;
 
 export type OverlayStyle =
-  | 'none'
-  | 'solid'
-  | 'gradient-bottom'
-  | 'gradient-top'
-  | 'cinematic'
-  | 'cinematic-soft'
-  | 'double'
-  | 'vignette'
-  | 'bottom-half';
+  | 'none' | 'solid' | 'gradient-bottom' | 'gradient-top'
+  | 'cinematic' | 'cinematic-soft' | 'double' | 'vignette' | 'bottom-half';
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type PaperBg = 'none' | 'cream' | 'grid' | 'lined';
 
 export type TextStroke = { color: string; width: number };
-export type TextShadow = {
-  color: string;
-  blur: number;
-  offsetX: number;
-  offsetY: number;
-};
+export type TextShadow = { color: string; blur: number; offsetX: number; offsetY: number };
 
 export type HeaderConfig = {
   enabled: boolean;
@@ -206,12 +241,6 @@ export type HeaderConfig = {
   textColor: string;
 };
 
-// ---------- NEW: shared theme for linked slides ----------
-
-/**
- * A "theme" holds the styling tokens that should be shared
- * across all linked slides in a post.
- */
 export type SlideTheme = {
   font: string;
   fontSize: number;
@@ -226,6 +255,7 @@ export type SlideTheme = {
   textShadow: TextShadow;
   letterSpacing: number;
   uppercase: boolean;
+  motion: MotionConfig;
 };
 
 export type PostConfig = {
@@ -247,8 +277,8 @@ export type PostConfig = {
   overlayStyle: OverlayStyle;
   overlayOpacity: number;
   elements: CanvasElement[];
-  /** NEW: if true, this slide inherits from the post's theme. */
   linkedTheme?: boolean;
+  motion: MotionConfig;
 };
 
 export const DEFAULT_CONFIG: PostConfig = {
@@ -262,8 +292,8 @@ export const DEFAULT_CONFIG: PostConfig = {
     accentColor: '#e07a3f',
     textColor: '#1a1a1a',
   },
-  headline: 'COLLEGE DEGREES CONSIDERED SAFEST FROM AI DISRUPTION',
-  highlightWord: 'DEGREES',
+  headline: 'YOUR BIG HEADLINE GOES HERE',
+  highlightWord: 'HEADLINE',
   font: 'Impact, "Arial Black", sans-serif',
   fontSize: 36,
   textColor: '#ffffff',
@@ -278,6 +308,7 @@ export const DEFAULT_CONFIG: PostConfig = {
   overlayOpacity: 0.45,
   elements: [],
   linkedTheme: true,
+  motion: { ...DEFAULT_MOTION },
 };
 
 export function createEmptySlide(): PostConfig {
@@ -288,10 +319,10 @@ export function createEmptySlide(): PostConfig {
     highlightWord: '',
     elements: [],
     linkedTheme: true,
+    motion: { ...DEFAULT_MOTION },
   };
 }
 
-/** Extracts the theme-able fields from a config into a SlideTheme object. */
 export function extractTheme(config: PostConfig): SlideTheme {
   return {
     font: config.font,
@@ -307,10 +338,10 @@ export function extractTheme(config: PostConfig): SlideTheme {
     textShadow: { ...config.textShadow },
     letterSpacing: config.letterSpacing,
     uppercase: config.uppercase,
+    motion: { ...config.motion },
   };
 }
 
-/** Applies a theme to a config, preserving content fields. */
 export function applyTheme(config: PostConfig, theme: SlideTheme): PostConfig {
   return {
     ...config,
@@ -327,15 +358,13 @@ export function applyTheme(config: PostConfig, theme: SlideTheme): PostConfig {
     textShadow: { ...theme.textShadow },
     letterSpacing: theme.letterSpacing,
     uppercase: theme.uppercase,
+    motion: { ...theme.motion },
   };
 }
-
-// ---------- Saved post ----------
 
 export type SavedPost = {
   id: string;
   slides: PostConfig[];
-  /** The shared theme for linked slides. */
   theme?: SlideTheme;
   previewDataUrl: string;
   createdAt: number;
@@ -348,9 +377,7 @@ export type LegacySavedPost = {
   createdAt: number;
 };
 
-export function isLegacyPost(
-  post: SavedPost | LegacySavedPost
-): post is LegacySavedPost {
+export function isLegacyPost(post: SavedPost | LegacySavedPost): post is LegacySavedPost {
   return 'config' in post && !('slides' in post);
 }
 
@@ -359,28 +386,21 @@ export function normalizeConfig(config: Partial<PostConfig>): PostConfig {
     ...DEFAULT_CONFIG,
     ...config,
     paperBg: config.paperBg ?? 'none',
-    header: {
-      ...DEFAULT_CONFIG.header,
-      ...(config.header ?? {}),
-    },
-    textStroke: {
-      ...DEFAULT_CONFIG.textStroke,
-      ...(config.textStroke ?? {}),
-    },
-    textShadow: {
-      ...DEFAULT_CONFIG.textShadow,
-      ...(config.textShadow ?? {}),
-    },
+    header: { ...DEFAULT_CONFIG.header, ...(config.header ?? {}) },
+    textStroke: { ...DEFAULT_CONFIG.textStroke, ...(config.textStroke ?? {}) },
+    textShadow: { ...DEFAULT_CONFIG.textShadow, ...(config.textShadow ?? {}) },
     elements: (config.elements ?? []) as CanvasElement[],
     linkedTheme: config.linkedTheme ?? true,
+    motion: { ...DEFAULT_MOTION, ...(config.motion ?? {}) },
   };
 }
 
 export function migrateLegacyPost(post: LegacySavedPost): SavedPost {
+  const normalized = normalizeConfig(post.config);
   return {
     id: post.id,
-    slides: [normalizeConfig(post.config)],
-    theme: extractTheme(normalizeConfig(post.config)),
+    slides: [normalized],
+    theme: extractTheme(normalized),
     previewDataUrl: post.previewDataUrl,
     createdAt: post.createdAt,
   };
