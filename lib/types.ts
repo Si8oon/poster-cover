@@ -18,8 +18,6 @@ export type SnapPosition =
   | 'bottom-left' | 'bottom-center' | 'bottom-right'
   | 'free';
 
-// ---------- Existing elements ----------
-
 export type CircleImageElement = {
   id: string;
   type: 'circleImage';
@@ -121,8 +119,6 @@ export type CardElement = {
   snap: SnapPosition;
 };
 
-// ---------- NEW: split image, quote mark, attribution ----------
-
 export type SplitImageElement = {
   id: string;
   type: 'splitImage';
@@ -179,8 +175,6 @@ export type CanvasElement =
   | QuoteMarkElement
   | AttributionElement;
 
-// ---------- Shared ----------
-
 export type OverlayStyle =
   | 'none'
   | 'solid'
@@ -212,6 +206,28 @@ export type HeaderConfig = {
   textColor: string;
 };
 
+// ---------- NEW: shared theme for linked slides ----------
+
+/**
+ * A "theme" holds the styling tokens that should be shared
+ * across all linked slides in a post.
+ */
+export type SlideTheme = {
+  font: string;
+  fontSize: number;
+  textColor: string;
+  highlightColor: string;
+  align: TextAlign;
+  paperBg: PaperBg;
+  header: HeaderConfig;
+  overlayStyle: OverlayStyle;
+  overlayOpacity: number;
+  textStroke: TextStroke;
+  textShadow: TextShadow;
+  letterSpacing: number;
+  uppercase: boolean;
+};
+
 export type PostConfig = {
   backgroundImage: string | null;
   paperBg: PaperBg;
@@ -231,6 +247,8 @@ export type PostConfig = {
   overlayStyle: OverlayStyle;
   overlayOpacity: number;
   elements: CanvasElement[];
+  /** NEW: if true, this slide inherits from the post's theme. */
+  linkedTheme?: boolean;
 };
 
 export const DEFAULT_CONFIG: PostConfig = {
@@ -259,6 +277,7 @@ export const DEFAULT_CONFIG: PostConfig = {
   overlayStyle: 'solid',
   overlayOpacity: 0.45,
   elements: [],
+  linkedTheme: true,
 };
 
 export function createEmptySlide(): PostConfig {
@@ -268,12 +287,56 @@ export function createEmptySlide(): PostConfig {
     headline: '',
     highlightWord: '',
     elements: [],
+    linkedTheme: true,
   };
 }
+
+/** Extracts the theme-able fields from a config into a SlideTheme object. */
+export function extractTheme(config: PostConfig): SlideTheme {
+  return {
+    font: config.font,
+    fontSize: config.fontSize,
+    textColor: config.textColor,
+    highlightColor: config.highlightColor,
+    align: config.align,
+    paperBg: config.paperBg,
+    header: { ...config.header },
+    overlayStyle: config.overlayStyle,
+    overlayOpacity: config.overlayOpacity,
+    textStroke: { ...config.textStroke },
+    textShadow: { ...config.textShadow },
+    letterSpacing: config.letterSpacing,
+    uppercase: config.uppercase,
+  };
+}
+
+/** Applies a theme to a config, preserving content fields. */
+export function applyTheme(config: PostConfig, theme: SlideTheme): PostConfig {
+  return {
+    ...config,
+    font: theme.font,
+    fontSize: theme.fontSize,
+    textColor: theme.textColor,
+    highlightColor: theme.highlightColor,
+    align: theme.align,
+    paperBg: theme.paperBg,
+    header: { ...theme.header },
+    overlayStyle: theme.overlayStyle,
+    overlayOpacity: theme.overlayOpacity,
+    textStroke: { ...theme.textStroke },
+    textShadow: { ...theme.textShadow },
+    letterSpacing: theme.letterSpacing,
+    uppercase: theme.uppercase,
+  };
+}
+
+// ---------- Saved post ----------
 
 export type SavedPost = {
   id: string;
   slides: PostConfig[];
+  /** The shared theme for linked slides. */
+  theme?: SlideTheme;
   previewDataUrl: string;
   createdAt: number;
 };
@@ -309,6 +372,7 @@ export function normalizeConfig(config: Partial<PostConfig>): PostConfig {
       ...(config.textShadow ?? {}),
     },
     elements: (config.elements ?? []) as CanvasElement[],
+    linkedTheme: config.linkedTheme ?? true,
   };
 }
 
@@ -316,6 +380,7 @@ export function migrateLegacyPost(post: LegacySavedPost): SavedPost {
   return {
     id: post.id,
     slides: [normalizeConfig(post.config)],
+    theme: extractTheme(normalizeConfig(post.config)),
     previewDataUrl: post.previewDataUrl,
     createdAt: post.createdAt,
   };

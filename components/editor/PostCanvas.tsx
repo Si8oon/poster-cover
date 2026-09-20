@@ -24,6 +24,7 @@ import type {
   BodyTextElement,
   AttributionElement,
 } from '@/lib/types';
+import { konvaFontFamily } from '@/lib/fonts';
 
 export const CANVAS_W = 432;
 export const CANVAS_H = 540;
@@ -70,6 +71,18 @@ export default function PostCanvas({
   const [bgProps, setBgProps] = useState<{
     x: number; y: number; width: number; height: number;
   } | null>(null);
+
+  // Warm font cache on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Ensure the fonts are loaded before Konva draws
+    if ((document as Document & { fonts?: FontFaceSet }).fonts) {
+      (document as Document & { fonts: FontFaceSet }).fonts.ready.then(() => {
+        // Force a redraw after fonts are ready
+        stageRef.current?.batchDraw();
+      });
+    }
+  }, [stageRef]);
 
   useEffect(() => {
     if (!config.backgroundImage) {
@@ -363,7 +376,7 @@ function HighlightedHeadline({
   }, []);
   if (!ctx) return null;
 
-  const safeFont = config.font ?? 'Impact, "Arial Black", sans-serif';
+  const safeFont = konvaFontFamily(config.font ?? 'Impact, "Arial Black", sans-serif');
   const safeFontSize = config.fontSize || 36;
   const safeTextColor = config.textColor ?? '#ffffff';
   const safeHighlightColor = config.highlightColor ?? '#00d97e';
@@ -506,7 +519,6 @@ function ElementRenderer({
   const x = (element.x ?? 0) * CANVAS_W;
   const y = (element.y ?? 0) * CANVAS_H;
 
-  // ---- circleImage ----
   if (element.type === 'circleImage') {
     const size = (element.size ?? 0.22) * CANVAS_W;
     const hasImage = !!element.imageUrl;
@@ -529,7 +541,6 @@ function ElementRenderer({
     );
   }
 
-  // ---- splitImage — non-draggable so clicks land on halves ----
   if (element.type === 'splitImage') {
     return (
       <Group ref={groupRef} x={x} y={y}>
@@ -538,7 +549,6 @@ function ElementRenderer({
     );
   }
 
-  // ---- logoPill ----
   if (element.type === 'logoPill') {
     const text = element.text ?? 'BRAND';
     const fSize = element.fontSize ?? 12;
@@ -557,7 +567,6 @@ function ElementRenderer({
     );
   }
 
-  // ---- swipeArrow ----
   if (element.type === 'swipeArrow') {
     const size = (element.size ?? 0.08) * CANVAS_W;
     const r = size / 2;
@@ -570,22 +579,21 @@ function ElementRenderer({
     );
   }
 
-  // ---- headingNumber ----
   if (element.type === 'headingNumber') {
     const num = element.number ?? '01';
+    const family = konvaFontFamily(element.font ?? 'Georgia, serif');
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
         <Text
-          key={`num-${num}-${element.fontSize}-${element.italic}`}
+          key={`num-${num}-${element.fontSize}-${element.italic}-${family}`}
           text={num} fontSize={element.fontSize ?? 90}
-          fontFamily={element.font ?? 'Georgia, serif'}
+          fontFamily={family}
           fontStyle={element.italic ? 'italic' : 'normal'}
           fill={element.color ?? '#e07a3f'} />
       </Group>
     );
   }
 
-  // ---- headingText ----
   if (element.type === 'headingText') {
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
@@ -594,7 +602,6 @@ function ElementRenderer({
     );
   }
 
-  // ---- bodyText ----
   if (element.type === 'bodyText') {
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
@@ -603,7 +610,6 @@ function ElementRenderer({
     );
   }
 
-  // ---- attribution ----
   if (element.type === 'attribution') {
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
@@ -612,22 +618,21 @@ function ElementRenderer({
     );
   }
 
-  // ---- quoteMark ----
   if (element.type === 'quoteMark') {
     const c = element.char ?? '"';
+    const family = konvaFontFamily(element.font ?? 'Georgia, serif');
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
         <Text
-          key={`qm-${c}-${element.fontSize}`}
+          key={`qm-${c}-${element.fontSize}-${family}`}
           text={c} fontSize={element.fontSize ?? 90}
-          fontFamily={element.font ?? 'Georgia, serif'}
+          fontFamily={family}
           fontStyle="bold"
           fill={element.color ?? '#ffffff'} />
       </Group>
     );
   }
 
-  // ---- card ----
   if (element.type === 'card') {
     return (
       <Group ref={groupRef} x={x} y={y} draggable onDragEnd={handleDragEnd}>
@@ -658,21 +663,13 @@ function SplitImage({
   return (
     <>
       {element.leftImageUrl ? (
-        <ImageWithCover
-          imageUrl={element.leftImageUrl}
-          x={0} y={0}
-          width={leftW} height={height}
-        />
+        <ImageWithCover imageUrl={element.leftImageUrl} x={0} y={0} width={leftW} height={height} />
       ) : (
         <Rect x={0} y={0} width={leftW} height={height} fill="#1a1a1a" />
       )}
 
       {element.rightImageUrl ? (
-        <ImageWithCover
-          imageUrl={element.rightImageUrl}
-          x={leftW} y={0}
-          width={rightW} height={height}
-        />
+        <ImageWithCover imageUrl={element.rightImageUrl} x={leftW} y={0} width={rightW} height={height} />
       ) : (
         <Rect x={leftW} y={0} width={rightW} height={height} fill="#1a1a1a" />
       )}
@@ -704,27 +701,14 @@ function SplitImage({
         </>
       )}
 
-      {/* Clickable rects — using solid fill + opacity instead of rgba */}
-      <Rect
-        x={0}
-        y={0}
-        width={leftW}
-        height={height}
-        fill="#000000"
-        opacity={0.001}
+      <Rect x={0} y={0} width={leftW} height={height}
+        fill="#000000" opacity={0.001}
         onClick={() => onRequestSide('left')}
-        onTap={() => onRequestSide('left')}
-      />
-      <Rect
-        x={leftW}
-        y={0}
-        width={rightW}
-        height={height}
-        fill="#000000"
-        opacity={0.001}
+        onTap={() => onRequestSide('left')} />
+      <Rect x={leftW} y={0} width={rightW} height={height}
+        fill="#000000" opacity={0.001}
         onClick={() => onRequestSide('right')}
-        onTap={() => onRequestSide('right')}
-      />
+        onTap={() => onRequestSide('right')} />
     </>
   );
 }
@@ -771,12 +755,13 @@ function ImageWithCover({
 function HeadingText({ element }: { element: HeadingTextElement }) {
   const w = (element.width ?? 0.85) * CANVAS_W;
   const text = element.text ?? 'Headline here';
+  const family = konvaFontFamily(element.font ?? 'Inter, system-ui, sans-serif');
   return (
     <Text
-      key={`ht-${text}-${element.fontSize}-${element.color}-${element.bold}-${element.shadow}-${element.align}`}
+      key={`ht-${text}-${element.fontSize}-${element.color}-${element.bold}-${element.shadow}-${element.align}-${family}`}
       text={text}
       fontSize={element.fontSize ?? 34}
-      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fontFamily={family}
       fontStyle={element.bold === false ? 'normal' : 'bold'}
       fill={element.color ?? '#1a1a1a'}
       width={w}
@@ -794,12 +779,13 @@ function HeadingText({ element }: { element: HeadingTextElement }) {
 function BodyText({ element }: { element: BodyTextElement }) {
   const w = (element.width ?? 0.85) * CANVAS_W;
   const text = element.text ?? 'Body text goes here.';
+  const family = konvaFontFamily(element.font ?? 'Inter, system-ui, sans-serif');
   return (
     <Text
-      key={`bt-${text}-${element.fontSize}-${element.color}-${element.align}`}
+      key={`bt-${text}-${element.fontSize}-${element.color}-${element.align}-${family}`}
       text={text}
       fontSize={element.fontSize ?? 14}
-      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fontFamily={family}
       fill={element.color ?? '#4a4a4a'}
       width={w}
       lineHeight={element.lineHeight ?? 1.4}
@@ -813,12 +799,13 @@ function Attribution({ element }: { element: AttributionElement }) {
   const raw = element.text ?? '';
   const text = (element.uppercase ?? false) ? raw.toUpperCase() : raw;
   const w = (element.width ?? 0.85) * CANVAS_W;
+  const family = konvaFontFamily(element.font ?? 'Inter, system-ui, sans-serif');
   return (
     <Text
-      key={`at-${text}-${element.fontSize}-${element.color}-${element.align}-${element.bold}`}
+      key={`at-${text}-${element.fontSize}-${element.color}-${element.align}-${element.bold}-${family}`}
       text={text}
       fontSize={element.fontSize ?? 12}
-      fontFamily={element.font ?? 'Inter, system-ui, sans-serif'}
+      fontFamily={family}
       fontStyle={element.bold === false ? 'normal' : 'bold'}
       fill={element.color ?? '#ffffff'}
       width={w}
@@ -860,14 +847,12 @@ function CardRenderer({ element }: { element: CardElement }) {
         shadowOpacity={shadowEnabled ? 0.12 : 0} />
       <Rect x={0} y={height - 5} width={width} height={5}
         cornerRadius={[0, 0, 14, 14] as unknown as number} fill={accent} />
-      <Text
-        key={`card-title-${element.title}`}
+      <Text key={`card-title-${element.title}`}
         text={element.title ?? 'Title'} x={PAD} y={PAD}
         width={width - PAD * 2} fontSize={TITLE_SIZE}
         fontFamily="Inter, system-ui, sans-serif" fontStyle="bold"
         fill={element.titleColor ?? '#111111'} />
-      <Text
-        key={`card-sub-${element.subtitle}`}
+      <Text key={`card-sub-${element.subtitle}`}
         text={element.subtitle ?? 'Subtitle goes here.'}
         x={PAD} y={PAD + titleHeight + 4} width={width - PAD * 2}
         fontSize={SUB_SIZE} fontFamily="Inter, system-ui, sans-serif"
@@ -877,18 +862,15 @@ function CardRenderer({ element }: { element: CardElement }) {
         const sy = height - PAD - statsHeight + 4;
         return (
           <Group key={i} x={sx} y={sy}>
-            <Text
-              key={`stat-icon-${i}-${stat.icon}`}
+            <Text key={`stat-icon-${i}-${stat.icon}`}
               text={stat.icon ?? '★'} x={0} y={0} fontSize={STAT_SIZE + 1}
               fontFamily="Inter, system-ui, sans-serif"
               fill={element.titleColor ?? '#111111'} />
-            <Text
-              key={`stat-val-${i}-${stat.value}`}
+            <Text key={`stat-val-${i}-${stat.value}`}
               text={stat.value ?? '—'} x={16} y={-2}
               fontSize={STAT_SIZE} fontFamily="Inter, system-ui, sans-serif"
               fontStyle="bold" fill={element.titleColor ?? '#111111'} />
-            <Text
-              key={`stat-lbl-${i}-${stat.label}`}
+            <Text key={`stat-lbl-${i}-${stat.label}`}
               text={stat.label ?? ''} x={16} y={STAT_SIZE + 1}
               fontSize={STAT_LABEL_SIZE}
               fontFamily="Inter, system-ui, sans-serif"

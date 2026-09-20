@@ -11,13 +11,18 @@ import { useUser } from '@/lib/useUser';
 type Props = {
   onNewPost: () => void;
   onPickTemplate?: (id: TemplateId) => void;
+  onOpenPost?: (id: string) => void;
   refreshKey?: number;
 };
 
-// Templates that go in the rotating hero (most striking)
 const HERO_TEMPLATES: TemplateId[] = ['splitQuote', 'editorialCover', 't3ch'];
 
-export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }: Props) {
+export default function HomeScreen({
+  onNewPost,
+  onPickTemplate,
+  onOpenPost,
+  refreshKey = 0,
+}: Props) {
   const [posts, setPosts] = useState<SavedPost[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const { name } = useUser();
@@ -26,7 +31,6 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
     setPosts(getPosts().slice(0, 6));
   }, [refreshKey]);
 
-  // Rotate hero every 4 seconds
   useEffect(() => {
     const t = setInterval(() => {
       setHeroIndex((i) => (i + 1) % HERO_TEMPLATES.length);
@@ -43,7 +47,6 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
 
   return (
     <div className="px-5 py-6 screen-in">
-      {/* ---------- Greeting ---------- */}
       <section className="fade-up" style={{ animationDelay: '0ms' }}>
         <h2 className="text-2xl font-bold">{greeting}</h2>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -51,12 +54,8 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
         </p>
       </section>
 
-      {/* ---------- HERO — rotating template showcase ---------- */}
       {heroTemplate && onPickTemplate && (
-        <section
-          className="mt-6 fade-up"
-          style={{ animationDelay: '80ms' }}
-        >
+        <section className="mt-6 fade-up" style={{ animationDelay: '80ms' }}>
           <div
             className="rounded-3xl p-4 relative overflow-hidden"
             style={{
@@ -64,12 +63,10 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
               boxShadow: 'var(--shadow)',
             }}
           >
-            {/* Soft deco circles */}
             <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
             <div className="absolute -bottom-12 -left-10 w-32 h-32 rounded-full bg-white/5" />
 
             <div className="relative flex items-center gap-4">
-              {/* Live preview */}
               <div
                 key={heroTemplate.id}
                 className="fade-in shrink-0 rounded-2xl overflow-hidden shadow-2xl"
@@ -82,11 +79,8 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
                 />
               </div>
 
-              {/* Info */}
               <div className="flex-1 min-w-0 text-white">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-widest opacity-80"
-                >
+                <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">
                   ✨ Featured template
                 </p>
                 <h3 className="text-xl font-bold mt-1.5 leading-tight">
@@ -106,7 +100,6 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
               </div>
             </div>
 
-            {/* Dots */}
             <div className="relative flex justify-center gap-1.5 mt-4">
               {HERO_TEMPLATES.map((_, i) => (
                 <button
@@ -127,12 +120,8 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
         </section>
       )}
 
-      {/* ---------- Templates strip ---------- */}
       {onPickTemplate && (
-        <section
-          className="mt-8 fade-up"
-          style={{ animationDelay: '160ms' }}
-        >
+        <section className="mt-8 fade-up" style={{ animationDelay: '160ms' }}>
           <div className="flex items-center justify-between mb-3">
             <h3
               className="text-sm font-semibold uppercase tracking-wider"
@@ -159,9 +148,7 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
                   baseConfig={DEFAULT_CONFIG}
                   width={100}
                 />
-                <p
-                  className="text-[10px] font-semibold mt-2 text-center truncate max-w-[100px]"
-                >
+                <p className="text-[10px] font-semibold mt-2 text-center truncate max-w-[100px]">
                   {t.emoji} {t.name}
                 </p>
               </button>
@@ -170,11 +157,7 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
         </section>
       )}
 
-      {/* ---------- Quick create ---------- */}
-      <section
-        className="mt-8 fade-up"
-        style={{ animationDelay: '280ms' }}
-      >
+      <section className="mt-8 fade-up" style={{ animationDelay: '280ms' }}>
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
           style={{ color: 'var(--text-muted)' }}
@@ -202,28 +185,18 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
             </div>
             <div className="flex-1">
               <p className="text-base font-bold">Quick create</p>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: 'var(--text-muted)' }}
-              >
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Upload a photo → write a headline
               </p>
             </div>
-            <span
-              className="text-lg"
-              style={{ color: 'var(--text-muted)' }}
-            >
+            <span className="text-lg" style={{ color: 'var(--text-muted)' }}>
               →
             </span>
           </div>
         </button>
       </section>
 
-      {/* ---------- Recent posts ---------- */}
-      <section
-        className="mt-8 fade-up"
-        style={{ animationDelay: '360ms' }}
-      >
+      <section className="mt-8 fade-up" style={{ animationDelay: '360ms' }}>
         <h3
           className="text-sm font-semibold uppercase tracking-wider mb-3"
           style={{ color: 'var(--text-muted)' }}
@@ -254,9 +227,10 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
               const firstSlide = post.slides?.[0];
               const slideCount = post.slides?.length ?? 0;
               return (
-                <div
+                <button
                   key={post.id}
-                  className="shrink-0 rounded-2xl overflow-hidden relative"
+                  onClick={() => onOpenPost?.(post.id)}
+                  className="shrink-0 rounded-2xl overflow-hidden relative transition active:scale-95"
                   style={{
                     width: 120,
                     border: '1px solid var(--border)',
@@ -277,7 +251,7 @@ export default function HomeScreen({ onNewPost, onPickTemplate, refreshKey = 0 }
                       {slideCount}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

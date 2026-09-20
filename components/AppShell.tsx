@@ -12,8 +12,12 @@ import SettingsScreen from './screens/SettingsScreen';
 import DesktopSidebar from './desktop/DesktopSidebar';
 import DesktopHome from './desktop/DesktopHome';
 import EditorScreen from './editor/EditorScreen';
+import NewPostSheet from './NewPostSheet';
 import Welcome from './Welcome';
 import { useTheme } from '@/lib/useTheme';
+import { getPost, type SavedPost } from '@/lib/storage';
+import { getSlideSet, type SlideSetId } from '@/lib/slideSets';
+import type { PostConfig } from '@/lib/types';
 import type { TemplateId } from '@/lib/templates';
 
 export type Tab = 'home' | 'templates' | 'posts' | 'settings';
@@ -23,9 +27,12 @@ const WELCOME_KEY = 'postgen:welcome-done:v2';
 export default function AppShell() {
   const [tab, setTab] = useState<Tab>('home');
   const [editorOpen, setEditorOpen] = useState(false);
-  const [pendingTemplate, setPendingTemplate] = useState<TemplateId | undefined>(
-    undefined
-  );
+  const [newSheetOpen, setNewSheetOpen] = useState(false);
+  const [newSheetStep, setNewSheetStep] = useState<'choice' | 'setConfig'>('choice');
+  const [newSheetSetId, setNewSheetSetId] = useState<SlideSetId | undefined>(undefined);
+  const [pendingTemplate, setPendingTemplate] = useState<TemplateId | undefined>(undefined);
+  const [pendingSlides, setPendingSlides] = useState<PostConfig[] | undefined>(undefined);
+  const [editingPost, setEditingPost] = useState<SavedPost | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
   const { loaded } = useTheme();
@@ -45,14 +52,68 @@ export default function AppShell() {
     setShowWelcome(true);
   };
 
-  const openEditor = (template?: TemplateId) => {
+  // ---------- Sheet openers ----------
+  const openNewSheet = () => {
+    setNewSheetStep('choice');
+    setNewSheetSetId(undefined);
+    setNewSheetOpen(true);
+  };
+
+  const openNewSheetOnSet = (id: SlideSetId) => {
+    setNewSheetStep('setConfig');
+    setNewSheetSetId(id);
+    setNewSheetOpen(true);
+  };
+
+  // ---------- Create flows ----------
+  const handleCreateSingle = () => {
+    setNewSheetOpen(false);
+    setPendingTemplate(undefined);
+    setPendingSlides(undefined);
+    setEditingPost(null);
+    setEditorOpen(true);
+  };
+
+  const handleCreateSet = (slides: PostConfig[], themeId: SlideSetId) => {
+    const def = getSlideSet(themeId);
+    setNewSheetOpen(false);
+    setPendingTemplate(undefined);
+    setPendingSlides(slides);
+    setEditingPost(
+      def
+        ? {
+            id: '',
+            slides,
+            theme: def.theme,
+            previewDataUrl: '',
+            createdAt: Date.now(),
+          }
+        : null
+    );
+    setEditorOpen(true);
+  };
+
+  const openEditorWithTemplate = (template?: TemplateId) => {
     setPendingTemplate(template);
+    setPendingSlides(undefined);
+    setEditingPost(null);
+    setEditorOpen(true);
+  };
+
+  const openEditorWithPost = (postId: string) => {
+    const post = getPost(postId);
+    if (!post) return;
+    setEditingPost(post);
+    setPendingSlides(undefined);
+    setPendingTemplate(undefined);
     setEditorOpen(true);
   };
 
   const closeEditor = () => {
     setEditorOpen(false);
     setPendingTemplate(undefined);
+    setPendingSlides(undefined);
+    setEditingPost(null);
   };
 
   const handleSaved = () => {
@@ -90,17 +151,19 @@ export default function AppShell() {
           >
             {tab === 'home' && (
               <HomeScreen
-                onNewPost={() => openEditor()}
-                onPickTemplate={(id) => openEditor(id)}
+                onNewPost={openNewSheet}
+                onPickTemplate={(id) => openEditorWithTemplate(id)}
+                onOpenPost={openEditorWithPost}
                 refreshKey={refreshKey}
               />
             )}
             {tab === 'templates' && (
-              <TemplatesScreen onPick={(id) => openEditor(id)} />
+              <TemplatesScreen onPick={(id) => openEditorWithTemplate(id)} />
             )}
             {tab === 'posts' && (
               <PostsScreen
-                onNewPost={() => openEditor()}
+                onNewPost={openNewSheet}
+                onOpenPost={openEditorWithPost}
                 refreshKey={refreshKey}
               />
             )}
@@ -108,7 +171,7 @@ export default function AppShell() {
               <SettingsScreen onResetWelcome={resetWelcome} />
             )}
           </main>
-          <FAB onClick={() => openEditor()} />
+          <FAB onClick={openNewSheet} />
           <BottomNav active={tab} onChange={setTab} />
         </div>
       </div>
@@ -125,25 +188,29 @@ export default function AppShell() {
         <DesktopSidebar
           active={tab}
           onChange={setTab}
-          onCreate={() => openEditor()}
+          onCreate={openNewSheet}
         />
         <div className="relative z-10 pt-24 pb-12">
           {tab === 'home' && (
             <DesktopHome
-              onCreate={() => openEditor()}
-              onPickTemplate={(id) => openEditor(id)}
+              onCreate={openNewSheet}
+              onPickTemplate={(id) => openEditorWithTemplate(id)}
+              onOpenPost={openEditorWithPost}
+              onOpenSlideSet={openNewSheetOnSet}
+              onOpenTemplates={() => setTab('templates')}
               refreshKey={refreshKey}
             />
           )}
           {tab === 'templates' && (
             <div className="px-10 py-10">
-              <TemplatesScreen onPick={(id) => openEditor(id)} />
+              <TemplatesScreen onPick={(id) => openEditorWithTemplate(id)} />
             </div>
           )}
           {tab === 'posts' && (
             <div className="px-10 py-10">
               <PostsScreen
-                onNewPost={() => openEditor()}
+                onNewPost={openNewSheet}
+                onOpenPost={openEditorWithPost}
                 refreshKey={refreshKey}
               />
             </div>
@@ -156,11 +223,26 @@ export default function AppShell() {
         </div>
       </div>
 
+      {/* NEW POST SHEET */}
+      {newSheetOpen && (
+        <NewPostSheet
+          onClose={() => setNewSheetOpen(false)}
+          onCreateSingle={handleCreateSingle}
+          onCreateSet={handleCreateSet}
+          initialStep={newSheetStep}
+          initialSetId={newSheetSetId}
+        />
+      )}
+
+      {/* EDITOR */}
       {editorOpen && (
         <EditorScreen
           onClose={closeEditor}
           onSaved={handleSaved}
           initialTemplate={pendingTemplate}
+          editingPostId={editingPost?.id || undefined}
+          initialSlides={editingPost?.slides ?? pendingSlides}
+          initialTheme={editingPost?.theme}
         />
       )}
     </>

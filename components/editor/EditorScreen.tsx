@@ -4,18 +4,22 @@
 import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
-import { savePost } from '@/lib/storage';
+import { savePost, updatePost } from '@/lib/storage';
 import {
   DEFAULT_CONFIG,
   createEmptySlide,
   normalizeConfig,
+  extractTheme,
+  applyTheme,
   type PostConfig,
   type CanvasElement,
   type CardElement,
   type CardStat,
   type SplitImageElement,
+  type SlideTheme,
 } from '@/lib/types';
 import { TEMPLATES, getTemplate, type TemplateId } from '@/lib/templates';
+import { ALL_FONTS, fontEntryToFamily, findFontEntry, warmupFonts } from '@/lib/fonts';
 import TemplatePreview from '../TemplatePreview';
 
 const PostCanvas = dynamic(() => import('./PostCanvas'), {
@@ -30,7 +34,7 @@ const PostCanvas = dynamic(() => import('./PostCanvas'), {
   ),
 });
 
-type Tab = 'template' | 'text' | 'fx' | 'style' | 'elements';
+type Tab = 'theme' | 'template' | 'text' | 'fx' | 'style' | 'elements';
 
 type Props = {
   onClose: () => void;
@@ -38,18 +42,8 @@ type Props = {
   initialTemplate?: TemplateId;
   editingPostId?: string;
   initialSlides?: PostConfig[];
+  initialTheme?: SlideTheme;
 };
-
-const FONTS = [
-  { label: 'Impact', value: 'Impact, "Arial Black", sans-serif' },
-  { label: 'Inter', value: 'Inter, system-ui, sans-serif' },
-  { label: 'Georgia (serif)', value: 'Georgia, serif' },
-  { label: 'Courier (mono)', value: '"Courier New", monospace' },
-  { label: 'Trebuchet', value: '"Trebuchet MS", sans-serif' },
-  { label: 'Arial Black', value: '"Arial Black", sans-serif' },
-  { label: 'Comic Sans (fun)', value: '"Comic Sans MS", cursive' },
-  { label: 'Verdana', value: 'Verdana, sans-serif' },
-];
 
 const COLORS = [
   '#ffffff', '#000000', '#00d97e', '#fbbf24', '#ef4444',
@@ -59,7 +53,7 @@ const COLORS = [
 ];
 
 export default function EditorScreen({
-  onClose, onSaved, initialTemplate, editingPostId, initialSlides,
+  onClose, onSaved, initialTemplate, editingPostId, initialSlides, initialTheme,
 }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +61,13 @@ export default function EditorScreen({
 
   const pendingElementIdRef = useRef<string | null>(null);
   const pendingSplitSideRef = useRef<'left' | 'right' | null>(null);
+
+  const isEditing = !!editingPostId;
+
+  // Warm up font resolution once
+  useEffect(() => {
+    warmupFonts();
+  }, []);
 
   const [slides, setSlides] = useState<PostConfig[]>(() => {
     if (initialSlides && initialSlides.length > 0)
@@ -81,8 +82,26 @@ export default function EditorScreen({
     }
     return [base];
   });
+
+  const [theme, setTheme] = useState<SlideTheme>(() => {
+    if (initialTheme) return initialTheme;
+    if (initialSlides && initialSlides.length > 0) {
+      return extractTheme(normalizeConfig(initialSlides[0]));
+    }
+    const base = { ...DEFAULT_CONFIG };
+    if (initialTemplate) {
+      const t = getTemplate(initialTemplate);
+      if (t) {
+        Object.assign(base, t.config);
+        if (t.elements) base.elements = t.elements;
+      }
+    }
+    return extractTheme(base);
+  });
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentSlide = slides[currentIndex];
+  const isCurrentLinked = currentSlide.linkedTheme !== false;
 
   const updateCurrentSlide = (patch: Partial<PostConfig>) => {
     setSlides((prev) =>
@@ -90,8 +109,34 @@ export default function EditorScreen({
     );
   };
 
+  const updateTheme = (patch: Partial<SlideTheme>) => {
+    const next: SlideTheme = { ...theme, ...patch };
+    setTheme(next);
+    setSlides((prev) =>
+      prev.map((s) => (s.linkedTheme === false ? s : applyTheme(s, next)))
+    );
+  };
+
+  const updateThemeHeader = (patch: Partial<SlideTheme['header']>) => {
+    updateTheme({ header: { ...theme.header, ...patch } });
+  };
+
+  const detachCurrentSlide = () => {
+    updateCurrentSlide({ linkedTheme: false });
+  };
+
+  const attachCurrentSlide = () => {
+    const linked = applyTheme(currentSlide, theme);
+    setSlides((prev) =>
+      prev.map((s, i) =>
+        i === currentIndex ? { ...linked, linkedTheme: true } : s
+      )
+    );
+  };
+
   const addSlide = () => {
-    setSlides((prev) => [...prev, createEmptySlide()]);
+    const fresh = applyTheme(createEmptySlide(), theme);
+    setSlides((prev) => [...prev, fresh]);
     setCurrentIndex(slides.length);
   };
   const duplicateSlide = () => {
@@ -109,7 +154,7 @@ export default function EditorScreen({
   };
   const deleteSlide = () => {
     if (slides.length === 1) {
-      setSlides([createEmptySlide()]);
+      setSlides([applyTheme(createEmptySlide(), theme)]);
       setCurrentIndex(0);
       return;
     }
@@ -134,10 +179,7 @@ export default function EditorScreen({
   }, [slides.length]);
 
   const [bgFile, setBgFile] = useState<File | null>(null);
-
-  const openBgPicker = () => {
-    bgInputRef.current?.click();
-  };
+  const openBgPicker = () => { bgInputRef.current?.click(); };
 
   const handleBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -157,21 +199,42 @@ export default function EditorScreen({
   const [activeTemplate, setActiveTemplate] = useState<TemplateId | null>(
     initialTemplate ?? null
   );
+
   const applyTemplate = (id: TemplateId) => {
     const t = getTemplate(id);
     if (!t) return;
     setActiveTemplate(id);
+
     setSlides((prev) =>
-      prev.map((s, i) =>
-        i === currentIndex
-          ? {
-              ...s,
-              ...t.config,
-              elements: t.elements ? t.elements : s.elements,
-            }
-          : s
-      )
+      prev.map((s, i) => {
+        if (i !== currentIndex) return s;
+        const merged: PostConfig = {
+          ...s,
+          ...t.config,
+          elements: t.elements ? t.elements : s.elements,
+        };
+        return merged;
+      })
     );
+
+    if (isCurrentLinked) {
+      const t2 = getTemplate(id);
+      if (t2) {
+        const merged = { ...currentSlide, ...t2.config };
+        if (t2.elements) merged.elements = t2.elements;
+        const newTheme = extractTheme(merged as PostConfig);
+        setTheme(newTheme);
+        setSlides((prev) =>
+          prev.map((s, i) =>
+            i === currentIndex || s.linkedTheme === false
+              ? i === currentIndex
+                ? ({ ...merged, linkedTheme: true } as PostConfig)
+                : s
+              : applyTheme(s, newTheme)
+          )
+        );
+      }
+    }
   };
 
   const addElement = (type: CanvasElement['type']) => {
@@ -185,11 +248,11 @@ export default function EditorScreen({
     } else if (type === 'swipeArrow') {
       el = { id, type: 'swipeArrow', x: 0.93, y: 0.5, size: 0.08, bgColor: '#ffffff', textColor: '#000000', snap: 'middle-right' };
     } else if (type === 'headingNumber') {
-      el = { id, type: 'headingNumber', x: 0.06, y: 0.12, number: '01', fontSize: 80, color: '#e07a3f', font: 'Georgia, serif', italic: true, snap: 'free' };
+      el = { id, type: 'headingNumber', x: 0.06, y: 0.12, number: '01', fontSize: 80, color: '#e07a3f', font: fontEntryToFamily(findFontEntry('Georgia, serif')), italic: true, snap: 'free' };
     } else if (type === 'headingText') {
-      el = { id, type: 'headingText', x: 0.06, y: 0.22, text: 'Your big headline goes here', fontSize: 34, color: '#1a1a1a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.85, align: 'left', shadow: false, snap: 'free' };
+      el = { id, type: 'headingText', x: 0.06, y: 0.22, text: 'Your big headline goes here', fontSize: 34, color: '#1a1a1a', font: fontEntryToFamily(findFontEntry('Inter, system-ui, sans-serif')), lineHeight: 1.05, bold: true, width: 0.85, align: 'left', shadow: false, snap: 'free' };
     } else if (type === 'bodyText') {
-      el = { id, type: 'bodyText', x: 0.06, y: 0.45, text: 'A short paragraph that describes your story in one or two sentences.', fontSize: 14, color: '#4a4a4a', font: 'Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.85, align: 'left', snap: 'free' };
+      el = { id, type: 'bodyText', x: 0.06, y: 0.45, text: 'A short paragraph that describes your story in one or two sentences.', fontSize: 14, color: '#4a4a4a', font: fontEntryToFamily(findFontEntry('Inter, system-ui, sans-serif')), lineHeight: 1.4, width: 0.85, align: 'left', snap: 'free' };
     } else if (type === 'splitImage') {
       el = {
         id, type: 'splitImage',
@@ -204,7 +267,7 @@ export default function EditorScreen({
         snap: 'free',
       };
     } else if (type === 'quoteMark') {
-      el = { id, type: 'quoteMark', x: 0.06, y: 0.5, char: '"', fontSize: 100, color: '#ffffff', font: 'Georgia, serif', snap: 'free' };
+      el = { id, type: 'quoteMark', x: 0.06, y: 0.5, char: '"', fontSize: 100, color: '#ffffff', font: fontEntryToFamily(findFontEntry('Georgia, serif')), snap: 'free' };
     } else if (type === 'attribution') {
       el = {
         id, type: 'attribution',
@@ -212,7 +275,7 @@ export default function EditorScreen({
         text: '- Author Name, Source (Year)',
         fontSize: 13,
         color: '#ffffff',
-        font: 'Inter, system-ui, sans-serif',
+        font: fontEntryToFamily(findFontEntry('Inter, system-ui, sans-serif')),
         letterSpacing: 1,
         uppercase: false,
         bold: true,
@@ -225,7 +288,7 @@ export default function EditorScreen({
         id, type: 'card',
         x: 0.06, y: 0.62,
         width: 0.88,
-        title: 'username/repo-name',
+        title: 'username/project-name',
         subtitle: 'A short description of what this thing is and why it matters.',
         stats: [
           { icon: '★', value: '10.5k', label: 'Stars' },
@@ -304,7 +367,7 @@ export default function EditorScreen({
     (e) => e.type === 'circleImage' && !(e as { imageUrl?: string }).imageUrl
   );
 
-  const [tab, setTab] = useState<Tab>('template');
+  const [tab, setTab] = useState<Tab>('theme');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -339,13 +402,21 @@ export default function EditorScreen({
     setSaving(true);
     try {
       const previewDataUrl = stage.toDataURL({ pixelRatio: 0.4 });
-      savePost({
+      const post = {
         id: editingPostId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         slides: [...slides],
+        theme,
         previewDataUrl,
         createdAt: Date.now(),
-      });
-      setToast('Saved!');
+      };
+
+      if (isEditing) {
+        updatePost(post);
+      } else {
+        savePost(post);
+      }
+
+      setToast(isEditing ? 'Updated!' : 'Saved!');
       setTimeout(() => { onSaved?.(); onClose(); }, 700);
     } catch (err) {
       console.error(err);
@@ -377,43 +448,63 @@ export default function EditorScreen({
         style={{ borderBottom: '1px solid var(--border)' }}>
         <button onClick={onClose} className="px-3 py-2 rounded-xl text-sm font-medium"
           style={{ color: 'var(--text-muted)' }}>✕ Cancel</button>
-        <p className="text-sm font-semibold">{editingPostId ? 'Edit Post' : 'New Post'}</p>
+        <p className="text-sm font-semibold">{isEditing ? 'Edit Post' : 'New Post'}</p>
         <button onClick={handleSave} disabled={saving}
           className="px-4 py-2 rounded-xl text-sm font-semibold active:scale-95 disabled:opacity-50 transition"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? 'Saving…' : isEditing ? 'Update' : 'Save'}
         </button>
       </header>
 
+      {/* Slide navigator */}
       <div className="px-4 py-3 flex items-center justify-between gap-3 shrink-0 overflow-x-auto no-scrollbar"
         style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={goPrev} disabled={currentIndex === 0}
             className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30"
             style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>◀</button>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg"
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5"
             style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-            Slide {currentIndex + 1} / {slides.length}
+            {isCurrentLinked ? '🔗' : '🔓'} Slide {currentIndex + 1} / {slides.length}
           </span>
           <button onClick={goNext} disabled={currentIndex === slides.length - 1}
             className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30"
             style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>▶</button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isCurrentLinked ? (
+            <button onClick={detachCurrentSlide}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              🔓 Detach
+            </button>
+          ) : (
+            <button onClick={attachCurrentSlide}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ color: 'var(--accent-fg)', background: 'var(--accent)', border: '1px solid var(--accent)' }}>
+              🔗 Link
+            </button>
+          )}
           <button onClick={addSlide} className="px-3 py-1.5 rounded-lg text-xs font-semibold"
             style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>+ Add</button>
           <button onClick={duplicateSlide} className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>⧉ Duplicate</button>
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>⧉ Dup</button>
           <button onClick={deleteSlide} className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{ color: '#ef4444', background: 'var(--card)', border: '1px solid var(--border)' }}>🗑 Delete</button>
+            style={{ color: '#ef4444', background: 'var(--card)', border: '1px solid var(--border)' }}>🗑</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <div className="max-w-[1100px] mx-auto px-4 py-6 flex flex-col lg:flex-row gap-8">
           <div className="flex-1 flex flex-col items-center gap-4">
-            <div className="shadow-2xl rounded-3xl overflow-hidden"
+            <div className="shadow-2xl rounded-3xl overflow-hidden relative"
               style={{ border: '1px solid var(--border)' }}>
+              {isCurrentLinked && (
+                <div className="absolute top-3 left-3 z-10 text-[10px] font-bold px-2 py-1 rounded-full"
+                  style={{ background: 'rgba(0,0,0,0.7)', color: '#fff' }}>
+                  🔗 Linked to theme
+                </div>
+              )}
               <PostCanvas config={currentSlide} onChange={updateCurrentSlide}
                 stageRef={stageRef} onRequestImage={handleRequestImage}
                 onRequestSplitImage={handleSplitImageRequest}
@@ -421,51 +512,38 @@ export default function EditorScreen({
             </div>
 
             <div className="w-full max-w-[432px] flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={openBgPicker}
+              <button type="button" onClick={openBgPicker}
                 className="w-full py-3 rounded-2xl text-sm font-semibold transition active:scale-95"
                 style={{
-                  background: 'var(--card)',
-                  border: '1px dashed var(--border)',
+                  background: 'var(--card)', border: '1px dashed var(--border)',
                   color: bgFile ? 'var(--accent)' : 'var(--text)',
-                }}
-              >
+                }}>
                 📸 {bgFile ? 'Change background photo' : 'Upload background photo'}
               </button>
 
               {hasSplitImage && splitEl && (
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSplitImageRequest(splitEl.id, 'left')}
+                  <button type="button" onClick={() => handleSplitImageRequest(splitEl.id, 'left')}
                     className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
                     style={{
-                      background: 'var(--card)',
-                      border: '1px dashed var(--border)',
+                      background: 'var(--card)', border: '1px dashed var(--border)',
                       color: splitEl.leftImageUrl ? 'var(--accent)' : 'var(--text)',
-                    }}
-                  >
+                    }}>
                     🖼️ {splitEl.leftImageUrl ? 'Change left photo' : 'Add left photo'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSplitImageRequest(splitEl.id, 'right')}
+                  <button type="button" onClick={() => handleSplitImageRequest(splitEl.id, 'right')}
                     className="py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
                     style={{
-                      background: 'var(--card)',
-                      border: '1px dashed var(--border)',
+                      background: 'var(--card)', border: '1px dashed var(--border)',
                       color: splitEl.rightImageUrl ? 'var(--accent)' : 'var(--text)',
-                    }}
-                  >
+                    }}>
                     🖼️ {splitEl.rightImageUrl ? 'Change right photo' : 'Add right photo'}
                   </button>
                 </div>
               )}
 
               {hasCircleImage && (
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => {
                     const circleEl = currentSlide.elements.find(
                       (e) => e.type === 'circleImage' && !(e as { imageUrl?: string }).imageUrl
@@ -474,44 +552,42 @@ export default function EditorScreen({
                   }}
                   className="w-full py-3 rounded-2xl text-xs font-semibold transition active:scale-95"
                   style={{
-                    background: 'var(--card)',
-                    border: '1px dashed var(--border)',
+                    background: 'var(--card)', border: '1px dashed var(--border)',
                     color: 'var(--text)',
-                  }}
-                >
+                  }}>
                   ⭕ Add circle photo
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={handleDownloadAll}
+              <button type="button" onClick={handleDownloadAll}
                 className="w-full py-3 rounded-2xl text-sm font-semibold active:scale-95 transition"
                 style={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
+                  background: 'var(--card)', border: '1px solid var(--border)',
                   color: 'var(--text)',
-                }}
-              >
+                }}>
                 ⬇ Download {slides.length > 1 ? `all ${slides.length} slides` : 'PNG'}
               </button>
             </div>
 
             {slides.length > 1 && (
               <div className="w-full max-w-[432px] flex gap-2 overflow-x-auto no-scrollbar py-1">
-                {slides.map((s, i) => (
-                  <button key={i} onClick={() => setCurrentIndex(i)}
-                    className="relative w-14 h-16 rounded-xl shrink-0 transition overflow-hidden"
-                    style={{
-                      background: s.backgroundImage
-                        ? `url(${s.backgroundImage}) center/cover`
-                        : 'var(--card)',
-                      border: i === currentIndex ? '2px solid var(--accent)' : '1px solid var(--border)',
-                    }}>
-                    <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold px-1 rounded"
-                      style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>{i + 1}</span>
-                  </button>
-                ))}
+                {slides.map((s, i) => {
+                  const linked = s.linkedTheme !== false;
+                  return (
+                    <button key={i} onClick={() => setCurrentIndex(i)}
+                      className="relative w-14 h-16 rounded-xl shrink-0 transition overflow-hidden"
+                      style={{
+                        background: s.backgroundImage
+                          ? `url(${s.backgroundImage}) center/cover`
+                          : 'var(--card)',
+                        border: i === currentIndex ? '2px solid var(--accent)' : '1px solid var(--border)',
+                      }}>
+                      <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold px-1 rounded"
+                        style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>{i + 1}</span>
+                      <span className="absolute top-0.5 left-0.5 text-[9px]">{linked ? '🔗' : '🔓'}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -523,7 +599,7 @@ export default function EditorScreen({
           <aside className="w-full lg:w-[400px] flex flex-col gap-4">
             <div className="flex gap-1 p-1 rounded-2xl overflow-x-auto no-scrollbar"
               style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-              {(['template', 'text', 'fx', 'style', 'elements'] as Tab[]).map((t) => (
+              {(['theme', 'template', 'text', 'fx', 'style', 'elements'] as Tab[]).map((t) => (
                 <button key={t} onClick={() => setTab(t)}
                   className="flex-1 py-2 rounded-xl text-[11px] font-semibold capitalize transition shrink-0 px-2"
                   style={{
@@ -533,50 +609,133 @@ export default function EditorScreen({
               ))}
             </div>
 
+            {/* THEME TAB */}
+            {tab === 'theme' && (
+              <div className="flex flex-col gap-5">
+                <div className="rounded-2xl p-3 text-xs"
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                  🔗 Changes here apply to all <strong>linked</strong> slides.
+                </div>
+
+                {/* Font picker with in-font preview */}
+                <div className="flex flex-col gap-2">
+                  <Label>Font (all slides)</Label>
+                  <FontPicker
+                    value={theme.font}
+                    onChange={(family) => updateTheme({ font: family })}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Text color</Label>
+                  <ColorRow colors={COLORS} value={theme.textColor}
+                    onChange={(c) => updateTheme({ textColor: c })} />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Highlight color</Label>
+                  <ColorRow colors={COLORS} value={theme.highlightColor}
+                    onChange={(c) => updateTheme({ highlightColor: c })} />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Paper background</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['none', 'cream', 'grid', 'lined'] as const).map((p) => (
+                      <button key={p} onClick={() => updateTheme({ paperBg: p })}
+                        className="py-2 rounded-xl text-[10px] font-semibold capitalize"
+                        style={{
+                          background: theme.paperBg === p ? 'var(--accent)' : 'var(--card)',
+                          color: theme.paperBg === p ? 'var(--accent-fg)' : 'var(--text)',
+                          border: '1px solid var(--border)',
+                        }}>{p}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 p-3 rounded-2xl"
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--text-muted)' }}>Auto header</span>
+                    <button onClick={() => updateThemeHeader({ enabled: !theme.header.enabled })}
+                      className="w-11 h-6 rounded-full relative transition"
+                      style={{ background: theme.header.enabled ? 'var(--accent)' : 'var(--border)' }}>
+                      <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                        style={{ left: theme.header.enabled ? '22px' : '2px' }} />
+                    </button>
+                  </div>
+                  {theme.header.enabled && (
+                    <>
+                      <input value={theme.header.handle}
+                        onChange={(e) => updateThemeHeader({ handle: e.target.value })}
+                        placeholder="@yourhandle"
+                        className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Progress accent</span>
+                        <ColorRow colors={COLORS} value={theme.header.accentColor}
+                          onChange={(c) => updateThemeHeader({ accentColor: c })} />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Overlay style</Label>
+                  <select value={theme.overlayStyle}
+                    onChange={(e) => updateTheme({
+                      overlayStyle: e.target.value as SlideTheme['overlayStyle'],
+                    })}
+                    className="w-full rounded-2xl p-3 text-sm outline-none"
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                    <option value="none">None</option>
+                    <option value="solid">Solid</option>
+                    <option value="gradient-bottom">Gradient (bottom)</option>
+                    <option value="gradient-top">Gradient (top)</option>
+                    <option value="cinematic">🎬 Cinematic</option>
+                    <option value="cinematic-soft">🎬 Cinematic (soft)</option>
+                    <option value="double">🎬 Double</option>
+                    <option value="vignette">🎬 Vignette</option>
+                    <option value="bottom-half">🎬 Bottom half</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Overlay darkness · {Math.round(theme.overlayOpacity * 100)}%</Label>
+                  <input type="range" min={0} max={100} value={theme.overlayOpacity * 100}
+                    onChange={(e) => updateTheme({ overlayOpacity: Number(e.target.value) / 100 })}
+                    className="w-full" />
+                </div>
+              </div>
+            )}
+
+            {/* TEMPLATE TAB */}
             {tab === 'template' && (
               <div className="grid grid-cols-1 gap-3">
                 {TEMPLATES.map((t) => {
                   const isActive = activeTemplate === t.id;
                   return (
-                    <button
-                      key={t.id}
-                      onClick={() => applyTemplate(t.id)}
+                    <button key={t.id} onClick={() => applyTemplate(t.id)}
                       className="p-3 rounded-2xl text-left transition active:scale-[0.98] flex gap-3"
                       style={{
                         background: isActive ? 'var(--card-hover)' : 'var(--card)',
                         border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                      }}
-                    >
+                      }}>
                       <div className="shrink-0">
-                        <TemplatePreview
-                          templateId={t.id}
-                          baseConfig={currentSlide}
-                          width={72}
-                        />
+                        <TemplatePreview templateId={t.id} baseConfig={currentSlide} width={72} />
                       </div>
-
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{t.emoji}</span>
                           <span className="text-sm font-semibold truncate">{t.name}</span>
                           {isActive && (
-                            <span
-                              className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0"
-                              style={{
-                                background: 'var(--accent)',
-                                color: 'var(--accent-fg)',
-                              }}
-                            >
-                              ON
-                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0"
+                              style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>ON</span>
                           )}
                         </div>
-                        <p
-                          className="text-[10px] leading-tight mt-1 line-clamp-2"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          {t.tagline}
-                        </p>
+                        <p className="text-[10px] leading-tight mt-1 line-clamp-2"
+                          style={{ color: 'var(--text-muted)' }}>{t.tagline}</p>
                       </div>
                     </button>
                   );
@@ -584,6 +743,7 @@ export default function EditorScreen({
               </div>
             )}
 
+            {/* TEXT TAB */}
             {tab === 'text' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
@@ -601,19 +761,10 @@ export default function EditorScreen({
                     className="w-full rounded-2xl p-3 text-sm outline-none"
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }} />
                 </div>
-                <button onClick={() => updateCurrentSlide({ uppercase: !currentSlide.uppercase })}
-                  className="flex items-center justify-between p-3 rounded-2xl transition"
-                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                  <span className="text-sm font-medium">UPPERCASE</span>
-                  <span className="w-11 h-6 rounded-full relative transition"
-                    style={{ background: currentSlide.uppercase ? 'var(--accent)' : 'var(--border)' }}>
-                    <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
-                      style={{ left: currentSlide.uppercase ? '22px' : '2px' }} />
-                  </span>
-                </button>
               </div>
             )}
 
+            {/* FX TAB */}
             {tab === 'fx' && (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
@@ -652,32 +803,6 @@ export default function EditorScreen({
                     })}
                     className="w-full" />
                 </div>
-                {currentSlide.textShadow.blur > 0 && (
-                  <>
-                    <div className="flex flex-col gap-2">
-                      <Label>Offset · X {currentSlide.textShadow.offsetX}, Y {currentSlide.textShadow.offsetY}</Label>
-                      <div className="flex gap-2">
-                        <input type="range" min={-15} max={15} value={currentSlide.textShadow.offsetX}
-                          onChange={(e) => updateCurrentSlide({
-                            textShadow: { ...currentSlide.textShadow, offsetX: Number(e.target.value) },
-                          })}
-                          className="w-full" />
-                        <input type="range" min={-15} max={15} value={currentSlide.textShadow.offsetY}
-                          onChange={(e) => updateCurrentSlide({
-                            textShadow: { ...currentSlide.textShadow, offsetY: Number(e.target.value) },
-                          })}
-                          className="w-full" />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label>Shadow color</Label>
-                      <ColorRow colors={COLORS} value={currentSlide.textShadow.color}
-                        onChange={(c) => updateCurrentSlide({
-                          textShadow: { ...currentSlide.textShadow, color: c },
-                        })} />
-                    </div>
-                  </>
-                )}
                 <div className="flex flex-col gap-2">
                   <Label>Quick presets</Label>
                   <div className="grid grid-cols-3 gap-2">
@@ -687,10 +812,8 @@ export default function EditorScreen({
                     })} />
                     <PresetButton label="Outline" onClick={() => updateCurrentSlide({
                       textStroke: { color: '#000000', width: 2.5 },
-                      textShadow: { color: '#000', blur: 0, offsetX: 0, offsetY: 0 },
                     })} />
                     <PresetButton label="Glow" onClick={() => updateCurrentSlide({
-                      textStroke: { color: '#000', width: 0 },
                       textShadow: { color: currentSlide.highlightColor, blur: 18, offsetX: 0, offsetY: 0 },
                     })} />
                     <PresetButton label="Meme" onClick={() => updateCurrentSlide({
@@ -698,12 +821,10 @@ export default function EditorScreen({
                       textShadow: { color: '#000000', blur: 4, offsetX: 3, offsetY: 3 },
                     })} />
                     <PresetButton label="Editorial" onClick={() => updateCurrentSlide({
-                      textStroke: { color: '#000', width: 0 },
                       textShadow: { color: '#000000', blur: 8, offsetX: 0, offsetY: 2 },
                       letterSpacing: -0.5,
                     })} />
                     <PresetButton label="Neon" onClick={() => updateCurrentSlide({
-                      textStroke: { color: '#000000', width: 0 },
                       textShadow: { color: '#22d3ee', blur: 22, offsetX: 0, offsetY: 0 },
                     })} />
                   </div>
@@ -711,37 +832,13 @@ export default function EditorScreen({
               </div>
             )}
 
+            {/* STYLE TAB */}
             {tab === 'style' && (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label>Font</Label>
-                  <select value={currentSlide.font}
-                    onChange={(e) => updateCurrentSlide({ font: e.target.value })}
-                    className="w-full rounded-2xl p-3 text-sm outline-none"
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                    {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
+                <div className="rounded-2xl p-3 text-xs"
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                  💡 Most styling is shared. Change the whole set in <strong>Theme</strong>.
                 </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Font size · {currentSlide.fontSize}px</Label>
-                  <input type="range" min={20} max={72} value={currentSlide.fontSize}
-                    onChange={(e) => updateCurrentSlide({ fontSize: Number(e.target.value) })}
-                    className="w-full" />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Text color</Label>
-                  <ColorRow colors={COLORS} value={currentSlide.textColor}
-                    onChange={(c) => updateCurrentSlide({ textColor: c })} />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Highlight color</Label>
-                  <ColorRow colors={COLORS} value={currentSlide.highlightColor}
-                    onChange={(c) => updateCurrentSlide({ highlightColor: c })} />
-                </div>
-
                 <div className="flex flex-col gap-2">
                   <Label>Alignment</Label>
                   <div className="flex gap-2">
@@ -756,108 +853,16 @@ export default function EditorScreen({
                     ))}
                   </div>
                 </div>
-
                 <div className="flex flex-col gap-2">
-                  <Label>Paper background</Label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['none', 'cream', 'grid', 'lined'] as const).map((p) => (
-                      <button key={p} onClick={() => updateCurrentSlide({
-                        paperBg: p,
-                        backgroundImage: p !== 'none' ? null : currentSlide.backgroundImage,
-                      })}
-                        className="py-2 rounded-xl text-[10px] font-semibold capitalize"
-                        style={{
-                          background: currentSlide.paperBg === p ? 'var(--accent)' : 'var(--card)',
-                          color: currentSlide.paperBg === p ? 'var(--accent-fg)' : 'var(--text)',
-                          border: '1px solid var(--border)',
-                        }}>{p}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 p-3 rounded-2xl"
-                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider"
-                      style={{ color: 'var(--text-muted)' }}>Auto header</span>
-                    <button onClick={() => updateCurrentSlide({
-                      header: { ...currentSlide.header, enabled: !currentSlide.header.enabled },
-                    })}
-                      className="w-11 h-6 rounded-full relative transition"
-                      style={{ background: currentSlide.header.enabled ? 'var(--accent)' : 'var(--border)' }}>
-                      <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
-                        style={{ left: currentSlide.header.enabled ? '22px' : '2px' }} />
-                    </button>
-                  </div>
-                  {currentSlide.header.enabled && (
-                    <>
-                      <input value={currentSlide.header.handle}
-                        onChange={(e) => updateCurrentSlide({
-                          header: { ...currentSlide.header, handle: e.target.value },
-                        })}
-                        placeholder="@yourhandle"
-                        className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-                      <div className="flex gap-2">
-                        <button onClick={() => updateCurrentSlide({
-                          header: { ...currentSlide.header, showCounter: !currentSlide.header.showCounter },
-                        })}
-                          className="flex-1 py-2 rounded-xl text-[10px] font-semibold"
-                          style={{
-                            background: currentSlide.header.showCounter ? 'var(--accent)' : 'var(--bg)',
-                            color: currentSlide.header.showCounter ? 'var(--accent-fg)' : 'var(--text-muted)',
-                            border: '1px solid var(--border)',
-                          }}>Counter</button>
-                        <button onClick={() => updateCurrentSlide({
-                          header: { ...currentSlide.header, showProgress: !currentSlide.header.showProgress },
-                        })}
-                          className="flex-1 py-2 rounded-xl text-[10px] font-semibold"
-                          style={{
-                            background: currentSlide.header.showProgress ? 'var(--accent)' : 'var(--bg)',
-                            color: currentSlide.header.showProgress ? 'var(--accent-fg)' : 'var(--text-muted)',
-                            border: '1px solid var(--border)',
-                          }}>Progress</button>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Progress accent</span>
-                        <ColorRow colors={COLORS} value={currentSlide.header.accentColor}
-                          onChange={(c) => updateCurrentSlide({
-                            header: { ...currentSlide.header, accentColor: c },
-                          })} />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Overlay style</Label>
-                  <select value={currentSlide.overlayStyle}
-                    onChange={(e) => updateCurrentSlide({
-                      overlayStyle: e.target.value as PostConfig['overlayStyle'],
-                    })}
-                    className="w-full rounded-2xl p-3 text-sm outline-none"
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                    <option value="none">None</option>
-                    <option value="solid">Solid</option>
-                    <option value="gradient-bottom">Gradient (bottom)</option>
-                    <option value="gradient-top">Gradient (top)</option>
-                    <option value="cinematic">🎬 Cinematic (bottom fade)</option>
-                    <option value="cinematic-soft">🎬 Cinematic (soft)</option>
-                    <option value="double">🎬 Double (wash + fade)</option>
-                    <option value="vignette">🎬 Vignette (corners)</option>
-                    <option value="bottom-half">🎬 Bottom half (hard)</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Overlay darkness · {Math.round(currentSlide.overlayOpacity * 100)}%</Label>
-                  <input type="range" min={0} max={100} value={currentSlide.overlayOpacity * 100}
-                    onChange={(e) => updateCurrentSlide({ overlayOpacity: Number(e.target.value) / 100 })}
+                  <Label>Font size · {currentSlide.fontSize}px</Label>
+                  <input type="range" min={16} max={72} value={currentSlide.fontSize}
+                    onChange={(e) => updateCurrentSlide({ fontSize: Number(e.target.value) })}
                     className="w-full" />
                 </div>
               </div>
             )}
 
+            {/* ELEMENTS TAB */}
             {tab === 'elements' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
@@ -868,7 +873,6 @@ export default function EditorScreen({
                     <AddButton onClick={() => addElement('swipeArrow')} emoji="➡️" label="Arrow" />
                   </div>
                 </div>
-
                 <div className="flex flex-col gap-2">
                   <Label>Editorial</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -878,7 +882,6 @@ export default function EditorScreen({
                     <AddButton onClick={() => addElement('card')} emoji="🗂️" label="Card" />
                   </div>
                 </div>
-
                 <div className="flex flex-col gap-2">
                   <Label>Split quote kit ⭐</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -887,7 +890,6 @@ export default function EditorScreen({
                     <AddButton onClick={() => addElement('attribution')} emoji="🖋️" label="Attribution" />
                   </div>
                 </div>
-
                 {currentSlide.elements.length === 0 ? (
                   <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
                     No elements on this slide yet.
@@ -926,6 +928,82 @@ function Label({ children }: { children: React.ReactNode }) {
   return (
     <label className="text-xs font-semibold uppercase tracking-wider"
       style={{ color: 'var(--text-muted)' }}>{children}</label>
+  );
+}
+
+/** Font picker with each font rendered in its own font */
+function FontPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (family: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Resolve current font name for the label
+  const currentEntry = findFontEntry(value);
+  const currentLabel = currentEntry?.name ?? 'Custom';
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full rounded-2xl p-3 text-sm outline-none text-left flex items-center justify-between"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+      >
+        <span style={{ fontFamily: value }}>{currentLabel}</span>
+        <span style={{ color: 'var(--text-muted)' }}>▾</span>
+      </button>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl overflow-hidden shadow-xl fade-in"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              maxHeight: 320,
+              overflowY: 'auto',
+            }}
+          >
+            <div
+              className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider sticky top-0"
+              style={{ background: 'var(--card)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+            >
+              Google Fonts
+            </div>
+            {ALL_FONTS.map((f) => {
+              const family = fontEntryToFamily(f);
+              const isActive = value === family;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    onChange(family);
+                    setOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2.5 transition flex items-center justify-between"
+                  style={{
+                    background: isActive ? 'var(--accent)' : 'transparent',
+                    color: isActive ? 'var(--accent-fg)' : 'var(--text)',
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
+                  <span style={{ fontFamily: family, fontSize: 16 }}>{f.name}</span>
+                  <span className="text-[10px] opacity-60">{f.category}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1044,11 +1122,10 @@ function ElementControls({
           <button onClick={onRequestImage}
             className="text-xs py-2 px-3 rounded-xl text-center transition"
             style={{
-              background: 'var(--bg)',
-              border: '1px dashed var(--border)',
+              background: 'var(--bg)', border: '1px dashed var(--border)',
               color: element.imageUrl ? 'var(--accent)' : 'var(--text-muted)',
             }}>
-            {element.imageUrl ? '✓ Image set — tap to change' : 'Pick image'}
+            {element.imageUrl ? '✓ Image set' : 'Pick image'}
           </button>
           <RangeRow label="Size" min={10} max={50} value={element.size * 100}
             display={`${Math.round(element.size * 100)}%`}
@@ -1067,13 +1144,6 @@ function ElementControls({
             placeholder={'"'}
             className="w-full rounded-xl px-3 py-2 text-xs outline-none"
             style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <div className="flex gap-1">
-            {['"', '❝', '„', '「', '❞'].map((c) => (
-              <button key={c} onClick={() => onChange({ char: c } as Partial<CanvasElement>)}
-                className="w-7 h-7 rounded-lg text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>{c}</button>
-            ))}
-          </div>
           <RangeRow label="Size" min={40} max={180} value={element.fontSize}
             display={`${element.fontSize}px`}
             onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
@@ -1092,9 +1162,6 @@ function ElementControls({
           <RangeRow label="Size" min={9} max={22} value={element.fontSize}
             display={`${element.fontSize}px`}
             onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <RangeRow label="Letter spacing" min={0} max={4} value={element.letterSpacing}
-            display={`${element.letterSpacing.toFixed(1)}px`}
-            onChange={(v) => onChange({ letterSpacing: v } as Partial<CanvasElement>)} />
           <MiniColorRow label="Color" colors={['#ffffff', '#e07a3f', '#fbbf24', '#000000', '#666666']}
             value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
         </>
@@ -1171,9 +1238,6 @@ function ElementControls({
           <RangeRow label="Size" min={10} max={24} value={element.fontSize}
             display={`${element.fontSize}px`}
             onChange={(v) => onChange({ fontSize: v } as Partial<CanvasElement>)} />
-          <RangeRow label="Width" min={40} max={100} value={element.width * 100}
-            display={`${Math.round(element.width * 100)}%`}
-            onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
           <MiniColorRow label="Color" colors={['#4a4a4a', '#111111', '#ffffff', '#666666', '#e07a3f']}
             value={element.color} onChange={(c) => onChange({ color: c } as Partial<CanvasElement>)} />
         </>
@@ -1199,8 +1263,7 @@ function SplitImageControls({
         <button onClick={() => onRequestImage('left')}
           className="text-[10px] py-2 px-2 rounded-xl text-center transition"
           style={{
-            background: 'var(--bg)',
-            border: '1px dashed var(--border)',
+            background: 'var(--bg)', border: '1px dashed var(--border)',
             color: element.leftImageUrl ? 'var(--accent)' : 'var(--text-muted)',
           }}>
           {element.leftImageUrl ? '✓ Left set' : 'Left image'}
@@ -1208,8 +1271,7 @@ function SplitImageControls({
         <button onClick={() => onRequestImage('right')}
           className="text-[10px] py-2 px-2 rounded-xl text-center transition"
           style={{
-            background: 'var(--bg)',
-            border: '1px dashed var(--border)',
+            background: 'var(--bg)', border: '1px dashed var(--border)',
             color: element.rightImageUrl ? 'var(--accent)' : 'var(--text-muted)',
           }}>
           {element.rightImageUrl ? '✓ Right set' : 'Right image'}
@@ -1224,20 +1286,6 @@ function SplitImageControls({
       <RangeRow label="Height" min={20} max={100} value={element.height * 100}
         display={`${Math.round(element.height * 100)}%`}
         onChange={(v) => onChange({ height: v / 100 } as Partial<CanvasElement>)} />
-      <div className="flex flex-col gap-1">
-        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Divider</span>
-        <div className="grid grid-cols-3 gap-2">
-          {(['none', 'line', 'gap'] as const).map((d) => (
-            <button key={d} onClick={() => onChange({ divider: d } as Partial<CanvasElement>)}
-              className="py-1.5 rounded-lg text-[10px] font-semibold capitalize"
-              style={{
-                background: element.divider === d ? 'var(--accent)' : 'var(--bg)',
-                color: element.divider === d ? 'var(--accent-fg)' : 'var(--text-muted)',
-                border: '1px solid var(--border)',
-              }}>{d}</button>
-          ))}
-        </div>
-      </div>
     </>
   );
 }
@@ -1266,9 +1314,6 @@ function CardControls({
         rows={2} placeholder="Short description"
         className="w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
         style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-      <RangeRow label="Width" min={50} max={100} value={element.width * 100}
-        display={`${Math.round(element.width * 100)}%`}
-        onChange={(v) => onChange({ width: v / 100 } as Partial<CanvasElement>)} />
 
       <div className="flex flex-col gap-2 mt-1">
         <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -1278,18 +1323,15 @@ function CardControls({
           const s = stats[i] ?? { icon: '★', value: '', label: '' };
           return (
             <div key={i} className="flex gap-1">
-              <input value={s.icon}
-                onChange={(e) => updateStat(i, { icon: e.target.value })}
+              <input value={s.icon} onChange={(e) => updateStat(i, { icon: e.target.value })}
                 placeholder="★"
                 className="w-10 rounded-lg px-2 py-1 text-xs text-center outline-none"
                 style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-              <input value={s.value}
-                onChange={(e) => updateStat(i, { value: e.target.value })}
+              <input value={s.value} onChange={(e) => updateStat(i, { value: e.target.value })}
                 placeholder="10.5k"
                 className="flex-1 rounded-lg px-2 py-1 text-xs outline-none"
                 style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-              <input value={s.label}
-                onChange={(e) => updateStat(i, { label: e.target.value })}
+              <input value={s.label} onChange={(e) => updateStat(i, { label: e.target.value })}
                 placeholder="Stars"
                 className="flex-1 rounded-lg px-2 py-1 text-xs outline-none"
                 style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />

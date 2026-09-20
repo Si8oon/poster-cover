@@ -7,33 +7,23 @@ import {
   isLegacyPost,
   migrateLegacyPost,
   normalizeConfig,
+  extractTheme,
 } from './types';
 
 const STORAGE_KEY = 'postgen:posts';
 const SCHEMA_VERSION_KEY = 'postgen:schema-version';
 
-/** Bump this whenever PostConfig gets new required fields. */
-const CURRENT_SCHEMA = 3;
+const CURRENT_SCHEMA = 4;
 
 export type { SavedPost };
 
-// ---------- Schema migration ----------
-
 function ensureSchemaUpToDate() {
   if (typeof window === 'undefined') return;
-
   const stored = localStorage.getItem(SCHEMA_VERSION_KEY);
   const storedVersion = stored ? parseInt(stored, 10) : 0;
-
   if (storedVersion === CURRENT_SCHEMA) return;
-
-  // Schema changed since last visit. Existing posts will be
-  // auto-normalized on read (see getPosts below), so we only
-  // need to bump the version marker.
   localStorage.setItem(SCHEMA_VERSION_KEY, String(CURRENT_SCHEMA));
 }
-
-// ---------- Posts ----------
 
 export function getPosts(): SavedPost[] {
   if (typeof window === 'undefined') return [];
@@ -50,14 +40,16 @@ export function getPosts(): SavedPost[] {
       if (isLegacyPost(p)) {
         migrated.push(migrateLegacyPost(p));
       } else {
+        const slides = (p.slides ?? []).map((s) => normalizeConfig(s));
+        const theme = p.theme ?? (slides[0] ? extractTheme(slides[0]) : undefined);
         migrated.push({
           ...p,
-          slides: (p.slides ?? []).map((s) => normalizeConfig(s)),
+          slides,
+          theme,
         });
       }
     }
 
-    // Rewrite storage if anything changed (migration is idempotent)
     const needsRewrite =
       parsed.some((p) => isLegacyPost(p)) ||
       JSON.stringify(parsed) !== JSON.stringify(migrated);
@@ -68,10 +60,13 @@ export function getPosts(): SavedPost[] {
 
     return migrated;
   } catch {
-    // Corrupted storage — reset silently to prevent crashes
     localStorage.removeItem(STORAGE_KEY);
     return [];
   }
+}
+
+export function getPost(id: string): SavedPost | null {
+  return getPosts().find((p) => p.id === id) ?? null;
 }
 
 export function savePost(post: SavedPost) {
@@ -85,19 +80,32 @@ export function updatePost(post: SavedPost) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
 
+export function duplicatePost(id: string): SavedPost | null {
+  const original = getPost(id);
+  if (!original) return null;
+  const copy: SavedPost = {
+    ...JSON.parse(JSON.stringify(original)),
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: Date.now(),
+  };
+  const all = getPosts();
+  all.unshift(copy);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  return copy;
+}
+
 export function deletePost(id: string) {
   const all = getPosts().filter((p) => p.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
 
-// ---------- Reset helpers (safe to call from UI) ----------
+// ---------- Reset helpers ----------
 
 export function clearPosts() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
 export function clearWelcomeFlag() {
-  // Covers both v1 and v2 keys just in case
   localStorage.removeItem('postgen:welcome-done');
   localStorage.removeItem('postgen:welcome-done:v2');
   localStorage.removeItem('postgen:welcome-done:v3');
@@ -109,7 +117,6 @@ export function clearDesktopNavFlag() {
 
 export function resetEverything() {
   if (typeof window === 'undefined') return;
-  // Only clear postgen keys — don't nuke other apps' data
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -118,7 +125,6 @@ export function resetEverything() {
   keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
-/** Returns a friendly summary of current local data. */
 export function getStorageSummary() {
   return {
     posts: getPosts().length,
