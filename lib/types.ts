@@ -21,23 +21,6 @@ export type SnapPosition =
   | 'bottom-left' | 'bottom-center' | 'bottom-right'
   | 'free';
 
-// ---------- Motion ----------
-export type MotionType = 'none' | 'breathing' | 'floating';
-
-export type MotionConfig = {
-  type: MotionType;
-  speed: number;
-  intensity: number;
-};
-
-export const DEFAULT_MOTION: MotionConfig = {
-  type: 'none',
-  speed: 1,
-  intensity: 1,
-};
-
-// ---------- Elements ----------
-
 export type CircleImageElement = {
   id: string;
   type: 'circleImage';
@@ -226,6 +209,13 @@ export type OverlayStyle =
   | 'none' | 'solid' | 'gradient-bottom' | 'gradient-top'
   | 'cinematic' | 'cinematic-soft' | 'double' | 'vignette' | 'bottom-half';
 
+// ---------- NEW: Edge effects + polish ----------
+export type EdgeEffect =
+  | 'none'
+  | 'feather'
+  | 'radial'
+  | 'fade-to-color';
+
 export type TextAlign = 'left' | 'center' | 'right';
 export type PaperBg = 'none' | 'cream' | 'grid' | 'lined';
 
@@ -255,7 +245,12 @@ export type SlideTheme = {
   textShadow: TextShadow;
   letterSpacing: number;
   uppercase: boolean;
-  motion: MotionConfig;
+  // ---------- Edge effects (theme-level) ----------
+  edgeEffect: EdgeEffect;
+  edgeIntensity: number;
+  edgeColor: string | null; // null = auto (use paper color)
+  blurBackground: boolean;
+  grainTexture: boolean;
 };
 
 export type PostConfig = {
@@ -263,7 +258,8 @@ export type PostConfig = {
   paperBg: PaperBg;
   header: HeaderConfig;
   headline: string;
-  highlightWord: string;
+  highlightWords: string[];
+  highlightWord?: string;
   font: string;
   fontSize: number;
   textColor: string;
@@ -278,7 +274,12 @@ export type PostConfig = {
   overlayOpacity: number;
   elements: CanvasElement[];
   linkedTheme?: boolean;
-  motion: MotionConfig;
+  // ---------- NEW: Edge effects ----------
+  edgeEffect: EdgeEffect;
+  edgeIntensity: number;
+  edgeColor: string | null;
+  blurBackground: boolean;
+  grainTexture: boolean;
 };
 
 export const DEFAULT_CONFIG: PostConfig = {
@@ -293,7 +294,7 @@ export const DEFAULT_CONFIG: PostConfig = {
     textColor: '#1a1a1a',
   },
   headline: 'YOUR BIG HEADLINE GOES HERE',
-  highlightWord: 'HEADLINE',
+  highlightWords: ['HEADLINE'],
   font: 'Impact, "Arial Black", sans-serif',
   fontSize: 36,
   textColor: '#ffffff',
@@ -308,7 +309,11 @@ export const DEFAULT_CONFIG: PostConfig = {
   overlayOpacity: 0.45,
   elements: [],
   linkedTheme: true,
-  motion: { ...DEFAULT_MOTION },
+  edgeEffect: 'none',
+  edgeIntensity: 0.5,
+  edgeColor: null,
+  blurBackground: false,
+  grainTexture: false,
 };
 
 export function createEmptySlide(): PostConfig {
@@ -316,10 +321,9 @@ export function createEmptySlide(): PostConfig {
     ...DEFAULT_CONFIG,
     backgroundImage: null,
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     elements: [],
     linkedTheme: true,
-    motion: { ...DEFAULT_MOTION },
   };
 }
 
@@ -338,7 +342,11 @@ export function extractTheme(config: PostConfig): SlideTheme {
     textShadow: { ...config.textShadow },
     letterSpacing: config.letterSpacing,
     uppercase: config.uppercase,
-    motion: { ...config.motion },
+    edgeEffect: config.edgeEffect,
+    edgeIntensity: config.edgeIntensity,
+    edgeColor: config.edgeColor,
+    blurBackground: config.blurBackground,
+    grainTexture: config.grainTexture,
   };
 }
 
@@ -358,7 +366,11 @@ export function applyTheme(config: PostConfig, theme: SlideTheme): PostConfig {
     textShadow: { ...theme.textShadow },
     letterSpacing: theme.letterSpacing,
     uppercase: theme.uppercase,
-    motion: { ...theme.motion },
+    edgeEffect: theme.edgeEffect,
+    edgeIntensity: theme.edgeIntensity,
+    edgeColor: theme.edgeColor,
+    blurBackground: theme.blurBackground,
+    grainTexture: theme.grainTexture,
   };
 }
 
@@ -382,16 +394,28 @@ export function isLegacyPost(post: SavedPost | LegacySavedPost): post is LegacyS
 }
 
 export function normalizeConfig(config: Partial<PostConfig>): PostConfig {
+  let highlightWords: string[] = [];
+  if (Array.isArray(config.highlightWords)) {
+    highlightWords = config.highlightWords;
+  } else if (typeof config.highlightWord === 'string' && config.highlightWord.trim()) {
+    highlightWords = [config.highlightWord];
+  }
+
   return {
     ...DEFAULT_CONFIG,
     ...config,
+    highlightWords,
     paperBg: config.paperBg ?? 'none',
     header: { ...DEFAULT_CONFIG.header, ...(config.header ?? {}) },
     textStroke: { ...DEFAULT_CONFIG.textStroke, ...(config.textStroke ?? {}) },
     textShadow: { ...DEFAULT_CONFIG.textShadow, ...(config.textShadow ?? {}) },
     elements: (config.elements ?? []) as CanvasElement[],
     linkedTheme: config.linkedTheme ?? true,
-    motion: { ...DEFAULT_MOTION, ...(config.motion ?? {}) },
+    edgeEffect: config.edgeEffect ?? 'none',
+    edgeIntensity: typeof config.edgeIntensity === 'number' ? config.edgeIntensity : 0.5,
+    edgeColor: config.edgeColor ?? null,
+    blurBackground: config.blurBackground ?? false,
+    grainTexture: config.grainTexture ?? false,
   };
 }
 

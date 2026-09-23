@@ -1,6 +1,6 @@
 // lib/slideSets.ts
 import type { PostConfig, SlideTheme } from './types';
-import { DEFAULT_CONFIG, extractTheme, applyTheme, DEFAULT_MOTION } from './types';
+import { DEFAULT_CONFIG, extractTheme, applyTheme } from './types';
 
 export type SlideSetId = 'editorial' | 'boldNews' | 'minimal' | 'magazine';
 
@@ -38,14 +38,18 @@ const editorialTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
-  motion: { ...DEFAULT_MOTION },
+  edgeEffect: 'none',
+  edgeIntensity: 0.5,
+  edgeColor: null,
+  blurBackground: false,
+  grainTexture: false,
 };
 
 function editorialCover(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, editorialTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 0.4,
     elements: [
       { id: nid(), type: 'bodyText', x: 0.08, y: 0.16, text: 'FEATURED · THIS WEEK', fontSize: 10, color: '#e07a3f', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
@@ -60,12 +64,12 @@ function editorialContent(index: number): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, editorialTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     elements: [
       { id: nid(), type: 'headingNumber', x: 0.06, y: 0.14, number: String(index).padStart(2, '0'), fontSize: 68, color: '#e07a3f', font: 'var(--font-playfair), Georgia, serif', italic: true, snap: 'free' },
       { id: nid(), type: 'headingText', x: 0.26, y: 0.18, text: 'Your headline goes here', fontSize: 24, color: '#111111', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.05, bold: true, width: 0.68, align: 'left', shadow: false, snap: 'free' },
-      { id: nid(), type: 'bodyText', x: 0.06, y: 0.42, text: 'A short paragraph that tells the story in one or two sentences. Keep it punchy and readable.', fontSize: 11, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.45, width: 0.88, align: 'left', snap: 'free' },
-      { id: nid(), type: 'card', x: 0.06, y: 0.66, width: 0.88, title: 'username/project-name', subtitle: 'A short description of what this thing is and why it matters.', stats: [ { icon: '★', value: '10.5k', label: 'Stars' }, { icon: '⑂', value: '2.2k', label: 'Forks' }, { icon: '◎', value: '88', label: 'Issues' } ], bgColor: '#ffffff', titleColor: '#111111', subtitleColor: '#666666', accentColor: '#fbbf24', shadow: true, snap: 'free' },
+      { id: nid(), type: 'bodyText', x: 0.06, y: 0.42, text: 'A short paragraph that tells the story in one or two sentences.', fontSize: 11, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.45, width: 0.88, align: 'left', snap: 'free' },
+      { id: nid(), type: 'card', x: 0.06, y: 0.66, width: 0.88, title: 'username/project-name', subtitle: 'A short description.', stats: [ { icon: '★', value: '10.5k', label: 'Stars' }, { icon: '⑂', value: '2.2k', label: 'Forks' }, { icon: '◎', value: '88', label: 'Issues' } ], bgColor: '#ffffff', titleColor: '#111111', subtitleColor: '#666666', accentColor: '#fbbf24', shadow: true, snap: 'free' },
     ],
   };
 }
@@ -74,11 +78,11 @@ function editorialOutro(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, editorialTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 1,
     elements: [
       { id: nid(), type: 'headingText', x: 0.1, y: 0.3, text: 'That’s a wrap.', fontSize: 42, color: '#111111', font: 'var(--font-playfair), Georgia, serif', lineHeight: 1.05, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
-      { id: nid(), type: 'bodyText', x: 0.1, y: 0.54, text: 'Save this post for later and follow for more weekly drops.', fontSize: 14, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.8, align: 'left', snap: 'free' },
+      { id: nid(), type: 'bodyText', x: 0.1, y: 0.54, text: 'Save this post for later and follow for more.', fontSize: 14, color: '#4a4a4a', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.4, width: 0.8, align: 'left', snap: 'free' },
       { id: nid(), type: 'logoPill', x: 0, y: 0, text: '★ SAVE FOR LATER', bgColor: '#e07a3f', textColor: '#ffffff', fontSize: 11, snap: 'bottom-center' },
     ],
   };
@@ -107,7 +111,11 @@ const boldNewsTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 6, offsetX: 0, offsetY: 2 },
   letterSpacing: 0,
   uppercase: true,
-  motion: { ...DEFAULT_MOTION },
+  edgeEffect: 'none',
+  edgeIntensity: 0.5,
+  edgeColor: null,
+  blurBackground: false,
+  grainTexture: false,
 };
 
 function boldNewsCover(): PostConfig {
@@ -115,7 +123,7 @@ function boldNewsCover(): PostConfig {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, boldNewsTheme),
     backgroundImage: null,
     headline: 'THE STORY EVERYONE IS TALKING ABOUT',
-    highlightWord: 'TALKING',
+    highlightWords: ['TALKING'],
     elements: [
       { id: nid(), type: 'logoPill', x: 0, y: 0, text: 'BRAND', bgColor: '#ef4444', textColor: '#ffffff', fontSize: 13, snap: 'top-center' },
     ],
@@ -126,7 +134,7 @@ function boldNewsContent(index: number): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, boldNewsTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     elements: [
       { id: nid(), type: 'headingNumber', x: 0.06, y: 0.08, number: String(index).padStart(2, '0'), fontSize: 60, color: '#fbbf24', font: 'var(--font-playfair), Georgia, serif', italic: false, snap: 'free' },
       { id: nid(), type: 'headingText', x: 0.06, y: 0.62, text: 'YOUR BIG HEADLINE GOES RIGHT HERE', fontSize: 26, color: '#ffffff', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.1, bold: true, width: 0.88, align: 'left', shadow: true, snap: 'free' },
@@ -139,7 +147,7 @@ function boldNewsOutro(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, boldNewsTheme),
     headline: 'FOLLOW FOR MORE',
-    highlightWord: 'MORE',
+    highlightWords: ['MORE'],
     textY: 0.5,
     elements: [],
   };
@@ -168,14 +176,18 @@ const minimalTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
-  motion: { ...DEFAULT_MOTION },
+  edgeEffect: 'none',
+  edgeIntensity: 0.5,
+  edgeColor: null,
+  blurBackground: false,
+  grainTexture: false,
 };
 
 function minimalCover(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, minimalTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 0.5,
     elements: [
       { id: nid(), type: 'headingText', x: 0.1, y: 0.34, text: 'A quiet idea worth sharing.', fontSize: 30, color: '#111111', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.15, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
@@ -188,11 +200,11 @@ function minimalContent(index: number): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, minimalTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     elements: [
       { id: nid(), type: 'headingNumber', x: 0.1, y: 0.18, number: String(index).padStart(2, '0'), fontSize: 50, color: '#111111', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', italic: false, snap: 'free' },
       { id: nid(), type: 'headingText', x: 0.1, y: 0.36, text: 'Your idea goes here', fontSize: 24, color: '#111111', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.2, bold: true, width: 0.8, align: 'left', shadow: false, snap: 'free' },
-      { id: nid(), type: 'bodyText', x: 0.1, y: 0.56, text: 'A short paragraph that expands on your idea in a couple of sentences.', fontSize: 13, color: '#4a4a4a', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.5, width: 0.8, align: 'left', snap: 'free' },
+      { id: nid(), type: 'bodyText', x: 0.1, y: 0.56, text: 'A short paragraph that expands on your idea.', fontSize: 13, color: '#4a4a4a', font: 'var(--font-space-grotesk), Inter, system-ui, sans-serif', lineHeight: 1.5, width: 0.8, align: 'left', snap: 'free' },
     ],
   };
 }
@@ -201,7 +213,7 @@ function minimalOutro(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, minimalTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 0.5,
     elements: [
       { id: nid(), type: 'headingText', x: 0.1, y: 0.36, text: 'Thanks for reading.', fontSize: 26, color: '#111111', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.2, bold: false, width: 0.8, align: 'left', shadow: false, snap: 'free' },
@@ -233,14 +245,18 @@ const magazineTheme: SlideTheme = {
   textShadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0 },
   letterSpacing: 0,
   uppercase: false,
-  motion: { ...DEFAULT_MOTION },
+  edgeEffect: 'none',
+  edgeIntensity: 0.5,
+  edgeColor: null,
+  blurBackground: false,
+  grainTexture: false,
 };
 
 function magazineCover(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, magazineTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 0.6,
     elements: [
       { id: nid(), type: 'bodyText', x: 0.08, y: 0.12, text: 'ISSUE 01 · 2026', fontSize: 10, color: '#dc2626', font: 'var(--font-outfit), Inter, system-ui, sans-serif', lineHeight: 1.2, width: 0.84, align: 'left', snap: 'free' },
@@ -254,11 +270,11 @@ function magazineContent(index: number): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, magazineTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     elements: [
       { id: nid(), type: 'headingNumber', x: 0.08, y: 0.14, number: String(index).padStart(2, '0'), fontSize: 56, color: '#dc2626', font: 'var(--font-dm-serif), Georgia, serif', italic: true, snap: 'free' },
       { id: nid(), type: 'headingText', x: 0.08, y: 0.34, text: 'A story worth telling', fontSize: 26, color: '#111111', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.1, bold: false, width: 0.84, align: 'left', shadow: false, snap: 'free' },
-      { id: nid(), type: 'bodyText', x: 0.08, y: 0.56, text: 'The details that matter — told in a way you\u2019ll actually remember.', fontSize: 13, color: '#4a4a4a', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.5, width: 0.84, align: 'left', snap: 'free' },
+      { id: nid(), type: 'bodyText', x: 0.08, y: 0.56, text: 'The details that matter — told in a way you\u2019ll remember.', fontSize: 13, color: '#4a4a4a', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.5, width: 0.84, align: 'left', snap: 'free' },
     ],
   };
 }
@@ -267,7 +283,7 @@ function magazineOutro(): PostConfig {
   return {
     ...applyTheme({ ...DEFAULT_CONFIG, linkedTheme: true }, magazineTheme),
     headline: '',
-    highlightWord: '',
+    highlightWords: [],
     textY: 0.5,
     elements: [
       { id: nid(), type: 'headingText', x: 0.08, y: 0.36, text: 'Until next issue.', fontSize: 32, color: '#111111', font: 'var(--font-dm-serif), Georgia, serif', lineHeight: 1.1, bold: false, width: 0.84, align: 'left', shadow: false, snap: 'free' },
@@ -275,8 +291,6 @@ function magazineOutro(): PostConfig {
     ],
   };
 }
-
-// ---------------- Registry ----------------
 
 export const SLIDE_SETS: SlideSetDef[] = [
   {

@@ -1,172 +1,115 @@
 // components/Welcome.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  WORLD_STYLES,
+  ENERGY_LEVELS,
+  DEFAULT_WORLD,
+  getWorld,
+  saveWorld,
+  type UserWorld,
+  type EnergyLevel,
+} from '@/lib/world';
+import WorldDecorations from './WorldDecorations';
+import FlowerOfLife from './FlowerOfLife';
+import ThemePicker from './ThemePicker';
+import { useTheme } from '@/lib/useTheme';
 
 type Props = {
   onDone: () => void;
 };
 
-const slides = [
-  {
-    emoji: '👋',
-    title: 'Welcome to Post Generator',
-    sub: 'Create beautiful social media posts in seconds — from any photo.',
-    accent: true,
-    bg: 'linear-gradient(135deg, #a5b4fc, #c4b5fd)',
-  },
-  {
-    emoji: '📸',
-    title: 'Upload any photo',
-    sub: "We auto-fit it perfectly. Portrait, landscape, square — doesn't matter.",
-    bg: 'linear-gradient(135deg, #bae6fd, #a5f3fc)',
-  },
-  {
-    emoji: '✍️',
-    title: 'Write your headline',
-    sub: "Pick a word to highlight. That's it. The layout handles the rest.",
-    bg: 'linear-gradient(135deg, #fbcfe8, #f9a8d4)',
-  },
-  {
-    emoji: '🎨',
-    title: 'Pick your style',
-    sub: 'Templates, fonts, colors, draggable elements — make it truly yours.',
-    bg: 'linear-gradient(135deg, #fed7aa, #fdba74)',
-  },
-  {
-    emoji: '🚀',
-    title: 'Ready to create?',
-    sub: 'Save your posts, download as PNG, and share them anywhere.',
-    accent: true,
-    bg: 'linear-gradient(135deg, #a7f3d0, #6ee7b7)',
-  },
-];
+type SlideId = 'welcome' | 'world' | 'features' | 'ready';
 
 export default function Welcome({ onDone }: Props) {
-  const [step, setStep] = useState(0);
-  const current = slides[step];
-  const isLast = step === slides.length - 1;
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [world, setWorld] = useState<UserWorld>(DEFAULT_WORLD);
+  const { theme, setTheme, loaded } = useTheme();
+
+  useEffect(() => {
+    setWorld(getWorld());
+  }, []);
+
+  useEffect(() => {
+    saveWorld(world);
+  }, [world]);
+
+  if (!loaded) {
+    return (
+      <div
+        className="fixed inset-0 z-[100]"
+        style={{ background: 'var(--bg)' }}
+      />
+    );
+  }
+
+  const slides: SlideId[] = ['welcome', 'world', 'features', 'ready'];
+  const currentSlide = slides[slideIndex];
+  const isLast = slideIndex === slides.length - 1;
 
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col overflow-hidden fade-in"
-      style={{ background: 'var(--bg)' }}
+      style={{ background: 'var(--bg)', color: 'var(--text)' }}
     >
+      {/* Ambient gradient */}
       <div
-        className="absolute inset-0 transition-all duration-700"
+        className="pointer-events-none absolute inset-0 opacity-90 transition-all duration-500"
         style={{
-          background: `linear-gradient(180deg, #e0f2fe 0%, #fef3f8 50%, #fef9f0 100%)`,
+          background: `radial-gradient(circle at 50% 30%, ${world.accentColor}22 0%, var(--bg) 70%)`,
         }}
       />
 
-      <div className="pointer-events-none absolute top-10 right-12">
-        <div
-          className="w-24 h-24 rounded-full blur-md opacity-80"
-          style={{ background: 'radial-gradient(circle, #fde68a, #fbbf24)' }}
-        />
-        <div
-          className="absolute inset-0 rounded-full blur-2xl opacity-60"
-          style={{ background: '#fde68a' }}
-        />
-      </div>
+      {/* Background visual — flower OR butterflies */}
+      {world.style === 'flower' ? (
+        <FlowerOfLife color={world.accentColor} />
+      ) : (
+        <div className="relative z-10">
+          <WorldDecorations world={world} />
+        </div>
+      )}
 
-      <Cloud top="8%" left="5%" scale={1} delay={0} direction="right" />
-      <Cloud top="14%" right="8%" scale={0.8} delay={1.5} direction="left" />
-      <Cloud top="22%" left="20%" scale={0.6} delay={3} direction="right" />
-      <Cloud bottom="18%" right="10%" scale={1.1} delay={2} direction="left" />
-      <Cloud bottom="24%" left="8%" scale={0.7} delay={0.5} direction="right" />
-
-      <div className="pointer-events-none absolute inset-0">
-        {[
-          { top: '18%', left: '14%', delay: 0 },
-          { top: '30%', right: '12%', delay: 0.5 },
-          { top: '42%', left: '8%', delay: 1 },
-          { top: '58%', right: '18%', delay: 1.5 },
-          { top: '72%', left: '22%', delay: 2 },
-          { top: '50%', right: '8%', delay: 0.8 },
-          { bottom: '30%', left: '10%', delay: 1.2 },
-          { bottom: '22%', right: '14%', delay: 0.3 },
-        ].map((s, i) => (
-          <div
-            key={i}
-            className="absolute text-2xl twinkle"
-            style={{
-              top: s.top,
-              left: s.left,
-              right: s.right,
-              bottom: s.bottom,
-              animationDelay: `${s.delay}s`,
-            }}
-          >
-            ✨
-          </div>
-        ))}
-      </div>
-
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute top-[24%] left-[30%] text-2xl float opacity-70">🦋</div>
-        <div className="absolute top-[60%] right-[22%] text-xl float-slow opacity-60">🌸</div>
-        <div className="absolute bottom-[26%] left-[24%] text-xl bob opacity-70">🌷</div>
-      </div>
-
-      <div className="relative z-10 flex justify-end p-4">
+      {/* Top bar */}
+      <div className="relative z-20 flex items-center justify-between p-4">
+        <ThemePicker current={theme} onChange={setTheme} />
         <button
           onClick={onDone}
-          className="px-4 py-2 rounded-xl text-sm font-semibold transition hover:bg-white/50"
-          style={{ color: '#64748b' }}
+          className="px-4 py-2 rounded-xl text-sm font-semibold transition hover:bg-white/5"
+          style={{ color: 'var(--text-muted)' }}
         >
           Skip →
         </button>
       </div>
 
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 text-center max-w-lg mx-auto w-full">
-        <div key={step} className="fade-up flex flex-col items-center">
-          <div className="relative mb-10">
-            <div
-              className="absolute inset-0 rounded-[2rem] blur-2xl opacity-60"
-              style={{ background: current.bg }}
+      {/* Content */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 text-center max-w-lg mx-auto w-full">
+        <div key={currentSlide} className="fade-up flex flex-col items-center w-full">
+          {currentSlide === 'welcome' && <WelcomeSlide world={world} />}
+          {currentSlide === 'world' && (
+            <ChooseSlide
+              world={world}
+              onStyleChange={(s) => setWorld((w) => ({ ...w, style: s }))}
+              onEnergyChange={(e) => setWorld((w) => ({ ...w, energy: e }))}
             />
-            <div
-              className="absolute inset-0 rounded-[2rem] pulse-ring"
-              style={{ background: current.bg, opacity: 0.5 }}
-            />
-            <div
-              className="relative w-32 h-32 rounded-[2rem] flex items-center justify-center text-6xl shadow-2xl transition-all duration-500"
-              style={{
-                background: current.bg,
-                boxShadow: '0 20px 40px -12px rgba(0,0,0,0.15)',
-              }}
-            >
-              {current.emoji}
-            </div>
-          </div>
-
-          <h1
-            className="text-3xl sm:text-4xl font-bold leading-tight max-w-md"
-            style={{ color: '#1e293b' }}
-          >
-            {current.title}
-          </h1>
-          <p
-            className="mt-5 text-base sm:text-lg leading-relaxed max-w-sm"
-            style={{ color: '#64748b' }}
-          >
-            {current.sub}
-          </p>
+          )}
+          {currentSlide === 'features' && <FeaturesSlide />}
+          {currentSlide === 'ready' && <ReadySlide world={world} />}
         </div>
       </div>
 
-      <div className="relative z-10 flex flex-col items-center gap-6 pb-12 px-8 w-full max-w-md mx-auto">
+      {/* Bottom */}
+      <div className="relative z-10 flex flex-col items-center gap-5 pb-10 px-6 w-full max-w-md mx-auto">
         <div className="flex gap-2">
           {slides.map((_, i) => (
             <button
               key={i}
-              onClick={() => setStep(i)}
+              onClick={() => setSlideIndex(i)}
               className="rounded-full transition-all duration-300"
               style={{
-                width: i === step ? 28 : 8,
+                width: i === slideIndex ? 28 : 8,
                 height: 8,
-                background: i === step ? '#8b5cf6' : 'rgba(0,0,0,0.1)',
+                background: i === slideIndex ? world.accentColor : 'var(--border)',
               }}
               aria-label={`Go to slide ${i + 1}`}
             />
@@ -174,22 +117,26 @@ export default function Welcome({ onDone }: Props) {
         </div>
 
         <div className="w-full flex gap-3">
-          {step > 0 && (
+          {slideIndex > 0 && (
             <button
-              onClick={() => setStep((s) => s - 1)}
-              className="flex-1 py-4 rounded-2xl font-semibold transition active:scale-[0.98] bg-white/70 backdrop-blur hover:bg-white"
-              style={{ color: '#475569', border: '1px solid rgba(0,0,0,0.06)' }}
+              onClick={() => setSlideIndex((s) => s - 1)}
+              className="flex-1 py-4 rounded-2xl font-semibold transition active:scale-[0.98]"
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
             >
               ← Back
             </button>
           )}
-
           <button
-            onClick={() => (isLast ? onDone() : setStep((s) => s + 1))}
-            className="flex-1 py-4 rounded-2xl font-semibold transition active:scale-[0.98] text-white shadow-xl"
+            onClick={() => (isLast ? onDone() : setSlideIndex((s) => s + 1))}
+            className="flex-1 py-4 rounded-2xl font-semibold transition active:scale-[0.98]"
             style={{
-              background: current.bg,
-              boxShadow: '0 12px 24px -8px rgba(139, 92, 246, 0.4)',
+              background: `linear-gradient(135deg, ${world.accentColor}, ${world.accentColor}dd)`,
+              color: '#ffffff',
+              boxShadow: `0 12px 24px -8px ${world.accentColor}66`,
             }}
           >
             {isLast ? 'Get Started 🚀' : 'Next →'}
@@ -200,42 +147,176 @@ export default function Welcome({ onDone }: Props) {
   );
 }
 
-function Cloud({
-  top,
-  left,
-  right,
-  bottom,
-  scale = 1,
-  delay = 0,
-  direction = 'right',
+// ---------- Slide 1 ----------
+function WelcomeSlide({ world }: { world: UserWorld }) {
+  return (
+    <>
+      <div className="relative mb-8">
+        <div
+          className="absolute inset-0 rounded-3xl blur-2xl opacity-60"
+          style={{ background: world.accentColor }}
+        />
+        <div
+          className="relative w-28 h-28 rounded-3xl flex items-center justify-center text-6xl"
+          style={{
+            background: `linear-gradient(135deg, ${world.accentColor}, ${world.accentColor}99)`,
+            boxShadow: `0 20px 40px -12px ${world.accentColor}66`,
+          }}
+        >
+          👋
+        </div>
+      </div>
+      <h1 className="text-3xl sm:text-4xl font-bold leading-tight max-w-md">
+        Welcome to Post Generator
+      </h1>
+      <p className="mt-5 text-base leading-relaxed max-w-sm" style={{ color: 'var(--text-muted)' }}>
+        A free creative canvas for making posts that actually hit. No design skills needed.
+      </p>
+    </>
+  );
+}
+
+// ---------- Slide 2: Choose your vibe ----------
+function ChooseSlide({
+  world,
+  onStyleChange,
+  onEnergyChange,
 }: {
-  top?: string;
-  left?: string;
-  right?: string;
-  bottom?: string;
-  scale?: number;
-  delay?: number;
-  direction?: 'left' | 'right';
+  world: UserWorld;
+  onStyleChange: (s: 'flower' | 'butterflies') => void;
+  onEnergyChange: (e: EnergyLevel) => void;
 }) {
   return (
-    <div
-      className={`pointer-events-none absolute ${direction === 'right' ? 'drift' : 'drift-reverse'}`}
-      style={{
-        top,
-        left,
-        right,
-        bottom,
-        transform: `scale(${scale})`,
-        animationDelay: `${delay}s`,
-        opacity: 0.85,
-      }}
-    >
-      <div className="relative">
-        <div className="w-24 h-10 bg-white rounded-full shadow-sm" />
-        <div className="absolute -top-3 left-3 w-14 h-14 bg-white rounded-full" />
-        <div className="absolute -top-5 left-9 w-20 h-20 bg-white rounded-full" />
-        <div className="absolute -top-2 right-3 w-12 h-12 bg-white rounded-full" />
+    <>
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold">Choose your vibe 🎨</h2>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Two worlds. Pick the one that fits your energy.
+        </p>
       </div>
-    </div>
+
+      {/* Two big world buttons */}
+      <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+        {WORLD_STYLES.map((s) => {
+          const active = world.style === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onStyleChange(s.id)}
+              className="aspect-square rounded-2xl flex flex-col items-center justify-center gap-2 p-3 transition active:scale-95"
+              style={{
+                background: active ? `${world.accentColor}22` : 'var(--card)',
+                border: active
+                  ? `2px solid ${world.accentColor}`
+                  : '1px solid var(--border)',
+              }}
+            >
+              <span className="text-4xl">{s.emoji}</span>
+              <span className="text-sm font-bold">{s.label}</span>
+              <span className="text-[10px] text-center leading-tight" style={{ color: 'var(--text-muted)' }}>
+                {s.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Energy — only show when butterflies is picked */}
+      {world.style === 'butterflies' && (
+        <div className="w-full max-w-md mt-6">
+          <p
+            className="text-[10px] font-bold uppercase tracking-widest mb-2 text-left"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Motion
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {ENERGY_LEVELS.map((e) => {
+              const active = world.energy === e.id;
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => onEnergyChange(e.id)}
+                  className="py-2 rounded-xl flex flex-col items-center gap-0.5 transition active:scale-95"
+                  style={{
+                    background: active ? `${world.accentColor}22` : 'var(--card)',
+                    border: active
+                      ? `2px solid ${world.accentColor}`
+                      : '1px solid var(--border)',
+                  }}
+                >
+                  <span className="text-lg">{e.emoji}</span>
+                  <span className="text-[10px] font-semibold">{e.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------- Slide 3 ----------
+function FeaturesSlide() {
+  const features = [
+    { emoji: '📸', label: 'Upload', desc: 'Any photo' },
+    { emoji: '✍️', label: 'Write', desc: 'Bold headlines' },
+    { emoji: '🎨', label: 'Style', desc: 'Templates & fonts' },
+    { emoji: '🚀', label: 'Export', desc: 'Crisp PNGs' },
+  ];
+
+  return (
+    <>
+      <h2 className="text-3xl font-bold mb-3">Everything in one place</h2>
+      <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
+        A full creative studio in your pocket
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+        {features.map((f) => (
+          <div
+            key={f.label}
+            className="rounded-2xl p-4 text-left"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <div className="text-3xl mb-2">{f.emoji}</div>
+            <p className="font-bold text-base">{f.label}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              {f.desc}
+            </p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ---------- Slide 4 ----------
+function ReadySlide({ world }: { world: UserWorld }) {
+  return (
+    <>
+      <div className="relative mb-8">
+        <div
+          className="absolute inset-0 rounded-3xl blur-2xl opacity-70 pulse-ring"
+          style={{ background: world.accentColor }}
+        />
+        <div
+          className="relative w-28 h-28 rounded-3xl flex items-center justify-center text-6xl"
+          style={{
+            background: `linear-gradient(135deg, ${world.accentColor}, ${world.accentColor}99)`,
+            boxShadow: `0 20px 40px -12px ${world.accentColor}99`,
+          }}
+        >
+          🚀
+        </div>
+      </div>
+      <h2 className="text-3xl sm:text-4xl font-bold leading-tight max-w-md">
+        Ready to make something loud
+      </h2>
+      <p className="mt-5 text-base leading-relaxed max-w-sm" style={{ color: 'var(--text-muted)' }}>
+        Your world is saved. You can change it anytime in Settings.
+      </p>
+    </>
   );
 }

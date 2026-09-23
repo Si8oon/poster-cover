@@ -11,7 +11,6 @@ import {
   normalizeConfig,
   extractTheme,
   applyTheme,
-  DEFAULT_MOTION,
   type PostConfig,
   type CanvasElement,
   type CardElement,
@@ -22,8 +21,6 @@ import {
 import { TEMPLATES, getTemplate, type TemplateId } from '@/lib/templates';
 import { ALL_FONTS, fontEntryToFamily, findFontEntry, warmupFonts } from '@/lib/fonts';
 import { useHistory } from '@/lib/useHistory';
-import { getTheme as getAppTheme } from '@/lib/themes';
-import type { ThemeId } from '@/lib/themes';
 import TemplatePreview from '../TemplatePreview';
 
 const PostCanvas = dynamic(() => import('./PostCanvas'), {
@@ -61,8 +58,6 @@ const COLORS = [
   '#e07a3f', '#faf7f0', '#1a1a1a', '#4a4a4a', '#666666',
 ];
 
-const THEME_KEY = 'postgen:theme';
-
 export default function EditorScreen({
   onClose, onSaved, initialTemplate, editingPostId, initialSlides, initialTheme,
 }: Props) {
@@ -80,16 +75,6 @@ export default function EditorScreen({
   }, []);
 
   const initialSnapshot: EditorSnapshot = (() => {
-    // Read the currently-active app theme's default motion (for new posts only)
-    let appThemeMotion = { ...DEFAULT_MOTION };
-    if (!isEditing && typeof window !== 'undefined') {
-      const savedThemeId = (localStorage.getItem(THEME_KEY) as ThemeId | null) ?? 'white';
-      const appTheme = getAppTheme(savedThemeId);
-      if (appTheme) {
-        appThemeMotion = { ...appTheme.defaultMotion };
-      }
-    }
-
     const computeSlides = (): PostConfig[] => {
       if (initialSlides && initialSlides.length > 0)
         return initialSlides.map((s) => normalizeConfig(s));
@@ -101,19 +86,14 @@ export default function EditorScreen({
           if (t.elements) base.elements = t.elements;
         }
       }
-      // Apply the app theme's motion to the new slide
-      base.motion = appThemeMotion;
-      return [base];
+      return [normalizeConfig(base)];
     };
 
     const slides = computeSlides();
 
     const theme: SlideTheme = (() => {
       if (initialTheme) return initialTheme;
-      if (slides.length > 0) {
-        const extracted = extractTheme(slides[0]);
-        return extracted;
-      }
+      if (slides.length > 0) return extractTheme(slides[0]);
       const base = { ...DEFAULT_CONFIG };
       if (initialTemplate) {
         const t = getTemplate(initialTemplate);
@@ -122,7 +102,6 @@ export default function EditorScreen({
           if (t.elements) base.elements = t.elements;
         }
       }
-      base.motion = appThemeMotion;
       return extractTheme(base);
     })();
 
@@ -135,6 +114,37 @@ export default function EditorScreen({
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentSlide = slides[currentIndex];
   const isCurrentLinked = currentSlide.linkedTheme !== false;
+
+  // ---------- Highlight words draft input ----------
+  const [highlightDraft, setHighlightDraft] = useState<string>(
+    (currentSlide.highlightWords ?? []).join(', ')
+  );
+
+  useEffect(() => {
+    setHighlightDraft((slides[currentIndex].highlightWords ?? []).join(', '));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
+  useEffect(() => {
+    const joined = (currentSlide.highlightWords ?? []).join(', ');
+    const parsedDraft = highlightDraft
+      .split(',')
+      .map((w) => w.trim())
+      .filter(Boolean)
+      .join(', ');
+    if (parsedDraft !== joined) {
+      setHighlightDraft(joined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlide.highlightWords]);
+
+  const commitHighlightWords = () => {
+    const words = highlightDraft
+      .split(',')
+      .map((w) => w.trim())
+      .filter(Boolean);
+    updateCurrentSlide({ highlightWords: words });
+  };
 
   const setSlides = (
     updater: PostConfig[] | ((prev: PostConfig[]) => PostConfig[]),
@@ -287,19 +297,22 @@ export default function EditorScreen({
     history.set((prev) => {
       const nextSlides = prev.slides.map((s, i) => {
         if (i !== currentIndex) return s;
-        const merged: PostConfig = {
+        const merged: PostConfig = normalizeConfig({
           ...s,
           ...t.config,
           elements: t.elements ? t.elements : s.elements,
-        };
+        });
         return merged;
       });
 
       const isLinked = prev.slides[currentIndex]?.linkedTheme !== false;
       if (isLinked) {
-        const merged = { ...prev.slides[currentIndex], ...t.config };
-        if (t.elements) merged.elements = t.elements;
-        const newTheme = extractTheme(merged as PostConfig);
+        const merged = normalizeConfig({
+          ...prev.slides[currentIndex],
+          ...t.config,
+          elements: t.elements ? t.elements : prev.slides[currentIndex].elements,
+        });
+        const newTheme = extractTheme(merged);
 
         return {
           theme: newTheme,
@@ -315,6 +328,13 @@ export default function EditorScreen({
 
       return { ...prev, slides: nextSlides };
     }, { immediate: true });
+
+    setTimeout(() => {
+      const newSlide = slides[currentIndex];
+      if (newSlide) {
+        setHighlightDraft((newSlide.highlightWords ?? []).join(', '));
+      }
+    }, 0);
   };
 
   const addElement = (type: CanvasElement['type']) => {
@@ -840,60 +860,95 @@ export default function EditorScreen({
                     className="w-full" />
                 </div>
 
+                {/* ---------- EDGE & POLISH ---------- */}
                 <div className="flex flex-col gap-3 p-3 rounded-2xl"
                   style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider"
-                      style={{ color: 'var(--text-muted)' }}>🎬 Motion</p>
+                      style={{ color: 'var(--text-muted)' }}>✨ Edge & Polish</p>
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      Bring decorative elements to life
+                      Soften edges, add magazine finish
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['none', 'breathing', 'floating'] as const).map((m) => (
-                      <button key={m}
-                        onClick={() => updateTheme({ motion: { ...theme.motion, type: m } })}
-                        className="py-2 rounded-xl text-[10px] font-semibold capitalize"
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: 'none', label: 'Solid' },
+                      { id: 'feather', label: 'Feather' },
+                      { id: 'radial', label: 'Radial' },
+                      { id: 'fade-to-color', label: 'Fade to color' },
+                    ] as const).map((e) => (
+                      <button key={e.id}
+                        onClick={() => updateTheme({ edgeEffect: e.id })}
+                        className="py-2 rounded-xl text-[10px] font-semibold"
                         style={{
-                          background: theme.motion.type === m ? 'var(--accent)' : 'var(--bg)',
-                          color: theme.motion.type === m ? 'var(--accent-fg)' : 'var(--text-muted)',
+                          background: theme.edgeEffect === e.id ? 'var(--accent)' : 'var(--bg)',
+                          color: theme.edgeEffect === e.id ? 'var(--accent-fg)' : 'var(--text-muted)',
                           border: '1px solid var(--border)',
-                        }}>
-                        {m === 'none' ? 'Off' : m}
-                      </button>
+                        }}>{e.label}</button>
                     ))}
                   </div>
 
-                  {theme.motion.type !== 'none' && (
+                  {theme.edgeEffect !== 'none' && (
                     <>
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                          <span>Speed</span>
-                          <span>{theme.motion.speed.toFixed(1)}×</span>
+                          <span>Intensity</span>
+                          <span>{Math.round(theme.edgeIntensity * 100)}%</span>
                         </span>
-                        <input type="range" min={0.5} max={2} step={0.1}
-                          value={theme.motion.speed}
-                          onChange={(e) => updateTheme({
-                            motion: { ...theme.motion, speed: Number(e.target.value) }
-                          })}
+                        <input type="range" min={0} max={100} value={theme.edgeIntensity * 100}
+                          onChange={(e) => updateTheme({ edgeIntensity: Number(e.target.value) / 100 })}
                           className="w-full" />
                       </div>
 
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                          <span>Intensity</span>
-                          <span>{theme.motion.intensity.toFixed(1)}×</span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Fade color · {theme.edgeColor === null ? 'matches paper' : 'custom'}
                         </span>
-                        <input type="range" min={0.5} max={1.5} step={0.1}
-                          value={theme.motion.intensity}
-                          onChange={(e) => updateTheme({
-                            motion: { ...theme.motion, intensity: Number(e.target.value) }
-                          })}
-                          className="w-full" />
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => updateTheme({ edgeColor: null })}
+                            className="px-3 py-1.5 rounded-lg text-[10px] font-semibold"
+                            style={{
+                              background: theme.edgeColor === null ? 'var(--accent)' : 'var(--bg)',
+                              color: theme.edgeColor === null ? 'var(--accent-fg)' : 'var(--text-muted)',
+                              border: '1px solid var(--border)',
+                            }}>
+                            Auto
+                          </button>
+                          {COLORS.slice(0, 10).map((c) => (
+                            <button key={c}
+                              onClick={() => updateTheme({ edgeColor: c })}
+                              className="w-6 h-6 rounded-full transition active:scale-90"
+                              style={{
+                                background: c,
+                                border: theme.edgeColor === c ? '2px solid var(--accent)' : '1px solid var(--border)',
+                              }} />
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium">Blur background</span>
+                    <button onClick={() => updateTheme({ blurBackground: !theme.blurBackground })}
+                      className="w-11 h-6 rounded-full relative transition"
+                      style={{ background: theme.blurBackground ? 'var(--accent)' : 'var(--border)' }}>
+                      <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                        style={{ left: theme.blurBackground ? '22px' : '2px' }} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium">Film grain</span>
+                    <button onClick={() => updateTheme({ grainTexture: !theme.grainTexture })}
+                      className="w-11 h-6 rounded-full relative transition"
+                      style={{ background: theme.grainTexture ? 'var(--accent)' : 'var(--border)' }}>
+                      <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                        style={{ left: theme.grainTexture ? '22px' : '2px' }} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -941,11 +996,42 @@ export default function EditorScreen({
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label>Highlight word</Label>
-                  <input value={currentSlide.highlightWord}
-                    onChange={(e) => updateCurrentSlide({ highlightWord: e.target.value })}
+                  <Label>Highlight words</Label>
+                  <input
+                    value={highlightDraft}
+                    onChange={(e) => setHighlightDraft(e.target.value)}
+                    onBlur={commitHighlightWords}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitHighlightWords();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="DEGREES, AI, SAFEST"
                     className="w-full rounded-2xl p-3 text-sm outline-none"
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                  />
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Type words separated by commas, then click away or press Enter.
+                  </p>
+                  {currentSlide.highlightWords && currentSlide.highlightWords.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {currentSlide.highlightWords.map((w, i) => (
+                        <span
+                          key={`${w}-${i}`}
+                          className="text-[10px] px-2 py-0.5 rounded-full"
+                          style={{
+                            background: currentSlide.highlightColor ?? '#00d97e',
+                            color: '#000',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {w}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -12,6 +12,7 @@ import {
   Line,
   Image as KonvaImage,
   Path,
+  Wedge,
 } from 'react-konva';
 import Konva from 'konva';
 import type {
@@ -39,7 +40,6 @@ type Props = {
   onRequestSplitImage?: (elementId: string, side: 'left' | 'right') => void;
   slideIndex?: number;
   slideCount?: number;
-  disableMotion?: boolean;
 };
 
 const SNAP_MARGIN = 24;
@@ -61,124 +61,14 @@ function snapPosition(snap: SnapPosition, w: number, h: number) {
   }
 }
 
-function useMotion(
-  config: PostConfig,
-  layerRef: React.RefObject<Konva.Layer | null>,
-  elementRefs: React.MutableRefObject<Map<string, Konva.Group>>,
-  disableMotion?: boolean
-) {
-  const animRef = useRef<any>(null);
-  const motion = config.motion;
-  const elementsCount = config.elements.length;
-
-  useEffect(() => {
-    if (animRef.current) {
-      animRef.current.stop();
-      animRef.current = null;
-    }
-
-    if (disableMotion) return;
-    if (!motion || motion.type === 'none') return;
-    if (!layerRef.current) return;
-
-    const speed = motion.speed || 1;
-    const intensity = motion.intensity || 1;
-    const elements = config.elements;
-
-    const originals = new Map<string, {
-      x: number; y: number; scaleX: number; scaleY: number; rotation: number; opacity: number;
-    }>();
-
-    elements.forEach((el) => {
-      const node = elementRefs.current.get(el.id);
-      if (!node) return;
-      originals.set(el.id, {
-        x: node.x(),
-        y: node.y(),
-        scaleX: node.scaleX(),
-        scaleY: node.scaleY(),
-        rotation: node.rotation(),
-        opacity: node.opacity(),
-      });
-    });
-
-    const timeStart = performance.now();
-    const KonvaAny = Konva as any;
-
-    const animFn = (frame: any) => {
-      const now = frame && typeof frame.time === 'number' ? frame.time : performance.now();
-      const t = ((now - timeStart) / 1000) * speed;
-
-      elements.forEach((el) => {
-        const node = elementRefs.current.get(el.id);
-        const orig = originals.get(el.id);
-        if (!node || !orig) return;
-
-        if (motion.type === 'breathing') {
-          const wave = Math.sin((t * Math.PI * 2) / 3);
-          const amt = wave * 0.05 * intensity;
-
-          if (el.type === 'crown' || el.type === 'logoPill' || el.type === 'circleImage') {
-            node.scaleX(orig.scaleX * (1 + amt));
-            node.scaleY(orig.scaleY * (1 + amt));
-          } else if (el.type === 'tag' || el.type === 'crossout' || el.type === 'swipeArrow') {
-            node.rotation(orig.rotation + wave * 1.5 * intensity);
-          } else if (el.type === 'quoteMark') {
-            node.opacity(
-              Math.max(0.6, orig.opacity - (1 - Math.cos((t * Math.PI * 2) / 3)) * 0.15 * intensity)
-            );
-          } else {
-            node.scaleX(orig.scaleX * (1 + amt * 0.5));
-            node.scaleY(orig.scaleY * (1 + amt * 0.5));
-          }
-        } else if (motion.type === 'floating') {
-          const phase = (t * Math.PI * 2) / 5;
-          const driftY = Math.sin(phase) * 8 * intensity;
-          const driftX = Math.cos(phase * 0.7) * 3 * intensity;
-          const rotWave = Math.sin(phase * 0.5) * 3 * intensity;
-
-          if (
-            el.type === 'crown' ||
-            el.type === 'tag' ||
-            el.type === 'circleImage' ||
-            el.type === 'logoPill' ||
-            el.type === 'quoteMark' ||
-            el.type === 'swipeArrow'
-          ) {
-            node.y(orig.y + driftY);
-            node.x(orig.x + driftX);
-          }
-
-          if (el.type === 'crown' || el.type === 'tag') {
-            node.rotation(orig.rotation + rotWave);
-          }
-
-          if (el.type === 'crossout') {
-            node.x(orig.x + Math.sin(phase) * 3 * intensity);
-          }
-        }
-      });
-    };
-
-    const anim = new KonvaAny.Animation(animFn, layerRef.current);
-    anim.start();
-    animRef.current = anim;
-
-    return () => {
-      anim.stop();
-      animRef.current = null;
-      originals.forEach((orig, id) => {
-        const node = elementRefs.current.get(id);
-        if (!node) return;
-        node.x(orig.x);
-        node.y(orig.y);
-        node.scaleX(orig.scaleX);
-        node.scaleY(orig.scaleY);
-        node.rotation(orig.rotation);
-        node.opacity(orig.opacity);
-      });
-    };
-  }, [motion.type, motion.speed, motion.intensity, disableMotion, elementsCount]);
+/** Returns a solid hex color for the paper background */
+function getPaperColor(paperBg: PaperBg): string {
+  switch (paperBg) {
+    case 'cream': return '#faf7f0';
+    case 'grid': return '#faf7f0';
+    case 'lined': return '#fdfcf8';
+    default: return '#ffffff';
+  }
 }
 
 export default function PostCanvas({
@@ -189,11 +79,7 @@ export default function PostCanvas({
   onRequestSplitImage,
   slideIndex = 0,
   slideCount = 1,
-  disableMotion = false,
 }: Props) {
-  const layerRef = useRef<Konva.Layer | null>(null);
-  const elementRefs = useRef<Map<string, Konva.Group>>(new Map());
-
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [bgProps, setBgProps] = useState<{
     x: number; y: number; width: number; height: number;
@@ -236,8 +122,6 @@ export default function PostCanvas({
     };
   }, [config.backgroundImage]);
 
-  useMotion(config, layerRef, elementRefs, disableMotion);
-
   const updateElement = (id: string, patch: Partial<CanvasElement>) => {
     const next = config.elements.map((el) =>
       el.id === id ? ({ ...el, ...patch } as CanvasElement) : el
@@ -245,17 +129,15 @@ export default function PostCanvas({
     onChange({ elements: next });
   };
 
-  const registerRef = (id: string, node: Konva.Group | null) => {
-    if (node) elementRefs.current.set(id, node);
-    else elementRefs.current.delete(id);
-  };
-
   const headerOffset = config.header?.enabled ? HEADER_H : 0;
-  const showEmptyHint = !config.backgroundImage && config.paperBg === 'none';
+  const showEmptyHint =
+    !config.backgroundImage && config.paperBg === 'none';
+  const paperColor = getPaperColor(config.paperBg);
+  const edgeColor = config.edgeColor ?? paperColor;
 
   return (
     <Stage ref={stageRef} width={CANVAS_W} height={CANVAS_H}>
-      <Layer ref={layerRef}>
+      <Layer>
         {config.paperBg !== 'none' && <PaperBackground type={config.paperBg} />}
 
         {!bgImage && config.paperBg === 'none' && (
@@ -268,6 +150,23 @@ export default function PostCanvas({
             x={bgProps.x} y={bgProps.y}
             width={bgProps.width} height={bgProps.height}
             listening={false}
+            filters={config.blurBackground ? [Konva.Filters.Blur] : undefined}
+            blurRadius={config.blurBackground ? 20 : 0}
+            // Re-cache when blur changes so filters re-apply
+            ref={(node) => {
+              if (node && config.blurBackground) {
+                node.cache();
+              }
+            }}
+          />
+        )}
+
+        {/* Edge effects — draw AFTER image so they overlay it */}
+        {bgImage && config.edgeEffect !== 'none' && (
+          <EdgeEffect
+            type={config.edgeEffect}
+            intensity={config.edgeIntensity}
+            color={edgeColor}
           />
         )}
 
@@ -295,7 +194,6 @@ export default function PostCanvas({
           <ElementRenderer
             key={el.id}
             element={el}
-            onRefReady={(node) => registerRef(el.id, node)}
             onChange={(patch) => updateElement(el.id, patch)}
             onRequestImage={() => onRequestImage(el.id)}
             onRequestSplitImage={(side) =>
@@ -309,6 +207,9 @@ export default function PostCanvas({
         {config.header?.enabled && (
           <AutoHeader config={config} slideIndex={slideIndex} slideCount={slideCount} />
         )}
+
+        {/* Grain texture — drawn on top of everything for authentic film look */}
+        {config.grainTexture && <GrainTexture />}
       </Layer>
     </Stage>
   );
@@ -316,10 +217,7 @@ export default function PostCanvas({
 
 // ---------------- Paper ----------------
 function PaperBackground({ type }: { type: PaperBg }) {
-  const baseColor =
-    type === 'cream' ? '#faf7f0' :
-    type === 'grid' ? '#faf7f0' :
-    type === 'lined' ? '#fdfcf8' : '#f3f4f6';
+  const baseColor = getPaperColor(type);
 
   const lines = [];
   if (type === 'grid') {
@@ -341,6 +239,220 @@ function PaperBackground({ type }: { type: PaperBg }) {
       {lines}
     </>
   );
+}
+
+// ---------------- Edge Effect ----------------
+function EdgeEffect({
+  type,
+  intensity,
+  color,
+}: {
+  type: PostConfig['edgeEffect'];
+  intensity: number;
+  color: string;
+}) {
+  const steps = 30;
+  const safeIntensity = Math.max(0, Math.min(1, intensity));
+
+  if (type === 'feather') {
+    // Fade all 4 edges toward the background color
+    // Edge thickness grows with intensity (10% → 45% of dimension)
+    const thickness = 0.10 + safeIntensity * 0.35;
+    const bands = Math.max(3, Math.floor(steps / 3));
+
+    const rects: React.ReactNode[] = [];
+
+    // Top edge
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const y = t * (CANVAS_H * thickness);
+      const alpha = (1 - t) * safeIntensity;
+      const bandH = (CANVAS_H * thickness) / bands + 1;
+      rects.push(
+        <Rect
+          key={`top-${i}`}
+          x={0} y={y}
+          width={CANVAS_W} height={bandH}
+          fill={color}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    // Bottom edge
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const y = CANVAS_H - (t * (CANVAS_H * thickness)) - (CANVAS_H * thickness) / bands;
+      const alpha = (1 - t) * safeIntensity;
+      const bandH = (CANVAS_H * thickness) / bands + 1;
+      rects.push(
+        <Rect
+          key={`bottom-${i}`}
+          x={0} y={y}
+          width={CANVAS_W} height={bandH}
+          fill={color}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    // Left edge
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const x = t * (CANVAS_W * thickness);
+      const alpha = (1 - t) * safeIntensity;
+      const bandW = (CANVAS_W * thickness) / bands + 1;
+      rects.push(
+        <Rect
+          key={`left-${i}`}
+          x={x} y={0}
+          width={bandW} height={CANVAS_H}
+          fill={color}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    // Right edge
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const x = CANVAS_W - (t * (CANVAS_W * thickness)) - (CANVAS_W * thickness) / bands;
+      const alpha = (1 - t) * safeIntensity;
+      const bandW = (CANVAS_W * thickness) / bands + 1;
+      rects.push(
+        <Rect
+          key={`right-${i}`}
+          x={x} y={0}
+          width={bandW} height={CANVAS_H}
+          fill={color}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    return <>{rects}</>;
+  }
+
+  if (type === 'radial') {
+    // Simulate radial fade with concentric wedge-shaped rings
+    // Konva doesn't have a native radial gradient on canvas, so we use
+    // a big circle with increasing opacity toward the edges.
+    const outerRadius = Math.max(CANVAS_W, CANVAS_H) * 0.85;
+    const centerX = CANVAS_W / 2;
+    const centerY = CANVAS_H / 2;
+    const rings = 24;
+
+    const ringNodes: React.ReactNode[] = [];
+    for (let i = 0; i < rings; i++) {
+      const t = i / (rings - 1);
+      // Innermost rings have 0 opacity, outermost have full
+      const innerRadius = t * outerRadius;
+      const alpha = Math.pow(t, 2) * safeIntensity;
+
+      ringNodes.push(
+        <Circle
+          key={`ring-${i}`}
+          x={centerX}
+          y={centerY}
+          radius={innerRadius}
+          stroke={color}
+          strokeWidth={outerRadius / rings + 1}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    return <>{ringNodes}</>;
+  }
+
+  if (type === 'fade-to-color') {
+    // Bottom-to-top gradient fading to the color
+    const bands = 30;
+    const fadeHeight = CANVAS_H * (0.3 + safeIntensity * 0.5);
+    const rects: React.ReactNode[] = [];
+
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const y = CANVAS_H - fadeHeight * (i / bands);
+      const alpha = Math.pow(t, 1.5) * safeIntensity;
+      const bandH = fadeHeight / bands + 1;
+      rects.push(
+        <Rect
+          key={`fade-${i}`}
+          x={0} y={y}
+          width={CANVAS_W} height={bandH}
+          fill={color}
+          opacity={alpha}
+          listening={false}
+        />
+      );
+    }
+    return <>{rects}</>;
+  }
+
+  return null;
+}
+
+// ---------------- Grain Texture ----------------
+function GrainTexture() {
+  // Pre-generate a noise pattern SVG once
+  const patternRef = useRef<HTMLCanvasElement | null>(null);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 200;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+
+    const imageData = ctx.createImageData(200, 200);
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      const v = Math.floor(Math.random() * 255);
+      imageData.data[i] = v;
+      imageData.data[i + 1] = v;
+      imageData.data[i + 2] = v;
+      imageData.data[i + 3] = 40; // low alpha per pixel
+    }
+    ctx.putImageData(imageData, 0, 0);
+    patternRef.current = c;
+    setDataUrl(c.toDataURL());
+  }, []);
+
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!dataUrl) return;
+    const i = new window.Image();
+    i.src = dataUrl;
+    i.onload = () => setImg(i);
+  }, [dataUrl]);
+
+  if (!img) return null;
+
+  // Tile the noise pattern by repeating small images
+  const tiles: React.ReactNode[] = [];
+  const tileSize = 100;
+  const cols = Math.ceil(CANVAS_W / tileSize);
+  const rows = Math.ceil(CANVAS_H / tileSize);
+
+  for (let x = 0; x < cols; x++) {
+    for (let y = 0; y < rows; y++) {
+      tiles.push(
+        <KonvaImage
+          key={`grain-${x}-${y}`}
+          image={img}
+          x={x * tileSize}
+          y={y * tileSize}
+          width={tileSize}
+          height={tileSize}
+          listening={false}
+          opacity={0.5}
+        />
+      );
+    }
+  }
+
+  return <>{tiles}</>;
 }
 
 // ---------------- Auto header ----------------
@@ -480,7 +592,7 @@ function Overlay({
   return null;
 }
 
-// ---------------- Headline ----------------
+// ---------------- Headline (multi-highlight) ----------------
 function HighlightedHeadline({
   config, offsetY = 0,
 }: {
@@ -509,7 +621,17 @@ function HighlightedHeadline({
   const upperText = uppercase
     ? (config.headline ?? '').toUpperCase()
     : (config.headline ?? '');
-  const upperHighlight = (config.highlightWord ?? '').trim();
+
+  const highlightWords: string[] = [];
+  if (Array.isArray(config.highlightWords)) {
+    for (const w of config.highlightWords) {
+      const clean = (w ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/gi, '');
+      if (clean) highlightWords.push(clean);
+    }
+  } else if (config.highlightWord) {
+    const clean = config.highlightWord.trim().toUpperCase().replace(/[^A-Z0-9]/gi, '');
+    if (clean) highlightWords.push(clean);
+  }
 
   const LINE_HEIGHT = safeFontSize * 1.12;
   const PADDING_X = 24;
@@ -546,7 +668,6 @@ function HighlightedHeadline({
 
   const elements: React.ReactNode[] = [];
   let y = startY;
-  const cleanHighlight = upperHighlight.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
   lines.forEach((lineWords, lineIdx) => {
     const lineWidth = lineWords.reduce(
@@ -560,7 +681,8 @@ function HighlightedHeadline({
 
     lineWords.forEach((word, wordIdx) => {
       const cleanWord = word.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-      const isHighlighted = cleanHighlight.length > 0 && cleanWord === cleanHighlight;
+      const isHighlighted =
+        highlightWords.length > 0 && highlightWords.includes(cleanWord);
       const fill = isHighlighted ? safeHighlightColor : safeTextColor;
 
       const chars = Array.from(word);
@@ -598,13 +720,12 @@ function HighlightedHeadline({
 
 // ---------------- Element Renderer ----------------
 function ElementRenderer({
-  element, onChange, onRequestImage, onRequestSplitImage, onRefReady,
+  element, onChange, onRequestImage, onRequestSplitImage,
 }: {
   element: CanvasElement;
   onChange: (patch: Partial<CanvasElement>) => void;
   onRequestImage: () => void;
   onRequestSplitImage: (side: 'left' | 'right') => void;
-  onRefReady: (node: Konva.Group | null) => void;
 }) {
   const groupRef = useRef<Konva.Group>(null);
 
@@ -624,12 +745,6 @@ function ElementRenderer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [element.snap]);
-
-  useEffect(() => {
-    onRefReady(groupRef.current);
-    return () => onRefReady(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleDragEnd = () => {
     const node = groupRef.current;
